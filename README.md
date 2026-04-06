@@ -52,6 +52,37 @@ npm run dev
 
 By default the Vite dev server runs locally and talks to the backend API defined in `VITE_API_BASE_URL`.
 
+## VPS Deployment
+
+This repo now includes frontend deployment scripts:
+
+- `scripts/deploy.sh`
+- `scripts/update.sh`
+
+Typical first deployment on the VPS:
+
+```bash
+cp .env.example .env
+chmod +x scripts/*.sh
+chmod +x scripts/lib/*.sh
+./scripts/deploy.sh
+```
+
+Typical update on the VPS:
+
+```bash
+./scripts/update.sh --force
+```
+
+Optional environment variables on the VPS:
+
+- `FRONTEND_DEPLOY_TARGET_DIR`
+  - if set, built files from `dist/` are synced there with `rsync`
+- `FRONTEND_POST_DEPLOY_CMD`
+  - if set, this command is executed after the build/sync step
+
+This is useful if you want to copy the Vite build into a Caddy-served directory or restart a frontend service after deployment.
+
 ## Build
 
 Production build:
@@ -106,3 +137,4 @@ The dashboard currently integrates with:
 - Requests are sent with `credentials: include`, so backend CORS and cookie settings must allow the frontend origin.
 - The frontend expects the backend OAuth callback flow to redirect users back to `FRONTEND_URL/auth/callback`.
 - This repo is intentionally separate from the bot/backend so frontend and backend can be pushed and deployed independently.
+- The GitHub Action deploy workflow calls `./scripts/update.sh --force` on the VPS.
