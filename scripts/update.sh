@@ -63,7 +63,12 @@ main() {
 
   log_info "Syncing frontend repository to origin/${DEPLOY_BRANCH}..."
   git fetch origin
-  git checkout "${DEPLOY_BRANCH}"
+
+  if git show-ref --verify --quiet "refs/heads/${DEPLOY_BRANCH}"; then
+    git checkout "${DEPLOY_BRANCH}"
+  else
+    git checkout -B "${DEPLOY_BRANCH}" "origin/${DEPLOY_BRANCH}"
+  fi
 
   if [[ "${FORCE}" == "true" ]]; then
     git reset --hard "origin/${DEPLOY_BRANCH}"
