@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "types": ["vite/client", "node"]
+  },
+  "include": [
+    "src/main.tsx",
+    "src/app/**/*.ts",
+    "src/app/**/*.tsx",
+    "src/styles/**/*.css",
+    "vite.config.ts"
+  ],
+  "exclude": ["src/app/components/ui/**/*", "node_modules", "dist"]
+}
