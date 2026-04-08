@@ -105,6 +105,25 @@ export interface AdminBotGuild {
   updatedAt: string;
 }
 
+export interface AdminWhitelistedGuild {
+  id: string;
+  guildId: string;
+  guildName: string | null;
+  notes: string | null;
+  addedByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GuildWhitelistEnforcementState {
+  enabled: boolean;
+  updatedAt: string | null;
+  reconciliation?: {
+    checked: number;
+    left: number;
+  };
+}
+
 export interface AdminGlobalConfigResponse {
   config: GlobalBotConfig;
   availableActivityTypes: BotActivityType[];
@@ -376,4 +395,48 @@ export async function leaveAdminBotGuild(guildId: string): Promise<void> {
   await apiFetch<{ success: boolean; guildId: string }>(`/admin/bot-guilds/${guildId}/leave`, {
     method: "DELETE"
   });
+}
+
+export async function getAdminWhitelistEnforcement(): Promise<GuildWhitelistEnforcementState> {
+  return apiFetch<GuildWhitelistEnforcementState>("/admin/settings/whitelist-enforcement");
+}
+
+export async function updateAdminWhitelistEnforcement(
+  enabled: boolean
+): Promise<GuildWhitelistEnforcementState> {
+  return apiFetch<GuildWhitelistEnforcementState>("/admin/settings/whitelist-enforcement", {
+    method: "PUT",
+    body: JSON.stringify({ enabled })
+  });
+}
+
+export async function getAdminWhitelistedGuilds(): Promise<AdminWhitelistedGuild[]> {
+  const response = await apiFetch<{ items: AdminWhitelistedGuild[]; total: number }>(
+    "/admin/whitelist/guilds"
+  );
+  return response.items;
+}
+
+export async function addAdminWhitelistedGuild(input: {
+  guildId: string;
+  guildName?: string;
+  notes?: string;
+}): Promise<AdminWhitelistedGuild> {
+  const response = await apiFetch<{ item: AdminWhitelistedGuild }>("/admin/whitelist/guilds", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+
+  return response.item;
+}
+
+export async function removeAdminWhitelistedGuild(
+  guildId: string
+): Promise<{ success: boolean; guildId: string; evicted: boolean }> {
+  return apiFetch<{ success: boolean; guildId: string; evicted: boolean }>(
+    `/admin/whitelist/guilds/${guildId}`,
+    {
+      method: "DELETE"
+    }
+  );
 }

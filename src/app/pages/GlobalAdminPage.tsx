@@ -1,10 +1,26 @@
-import { DragEvent, FormEvent, useEffect, useMemo, useState } from "react";
-import { GripVertical } from "lucide-react";
+import { DragEvent, FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import {
+  Activity,
+  Crown,
+  GripVertical,
+  LockKeyhole,
+  Plus,
+  RefreshCcw,
+  Save,
+  Server,
+  ShieldAlert,
+  ShieldCheck,
+  ShieldEllipsis,
+  Trash2,
+  UserCog
+} from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "../lib/auth";
+import { useAuth } from "@/app/lib/auth";
 import {
   addAdminGlobalAdmin,
+  addAdminWhitelistedGuild,
   AdminBotGuild,
+  AdminWhitelistedGuild,
   ApiHttpError,
   BotActivityType,
   BotStatusMessage,
@@ -14,17 +30,55 @@ import {
   getAdminGlobalAdmins,
   getAdminGlobalConfig,
   getAdminStatusMessages,
+  getAdminWhitelistedGuilds,
+  getAdminWhitelistEnforcement,
   GlobalAdminUser,
   GlobalBotConfig,
   leaveAdminBotGuild,
   removeAdminGlobalAdmin,
+  removeAdminWhitelistedGuild,
   reorderAdminStatusMessages,
   syncAdminBotGuilds,
   toggleAdminStatusMessage,
   updateAdminGlobalConfig,
-  updateAdminStatusMessage
-} from "../lib/api";
-import { LoadingScreen } from "../components/LoadingScreen";
+  updateAdminStatusMessage,
+  updateAdminWhitelistEnforcement
+} from "@/app/lib/api";
+import { formatDateTime, formatRelativeTime, getInitials } from "@/app/lib/format";
+import { cn } from "@/app/lib/utils";
+import { LoadingScreen } from "@/app/components/LoadingScreen";
+import { DashboardHeader } from "@/app/components/shared/DashboardHeader";
+import { EmptyState } from "@/app/components/shared/EmptyState";
+import { GuildAvatar } from "@/app/components/shared/GuildAvatar";
+import { SummaryCard } from "@/app/components/shared/SummaryCard";
+import { Badge } from "@/app/components/ui/badge";
+import { Button } from "@/app/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from "@/app/components/ui/card";
+import { Input } from "@/app/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/app/components/ui/select";
+import { Switch } from "@/app/components/ui/switch";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/app/components/ui/table";
+import { Textarea } from "@/app/components/ui/textarea";
 
 interface StatusFormState {
   text: string;
@@ -39,6 +93,24 @@ const DEFAULT_STATUS_FORM: StatusFormState = {
   isEnabled: true,
   usePlaceholders: true
 };
+
+function FieldLabel({
+  htmlFor,
+  children
+}: {
+  htmlFor?: string;
+  children: ReactNode;
+}) {
+  return (
+    <label htmlFor={htmlFor} className="text-sm font-medium text-foreground">
+      {children}
+    </label>
+  );
+}
+
+function FieldHint({ children }: { children: ReactNode }) {
+  return <p className="text-xs leading-5 text-muted-foreground">{children}</p>;
+}
 
 export function GlobalAdminPage() {
   const { user } = useAuth();
@@ -65,32 +137,110 @@ export function GlobalAdminPage() {
   const [newAdminDiscordId, setNewAdminDiscordId] = useState("");
 
   const [botGuilds, setBotGuilds] = useState<AdminBotGuild[]>([]);
+  const [whitelistedGuilds, setWhitelistedGuilds] = useState<AdminWhitelistedGuild[]>([]);
+  const [whitelistEnforced, setWhitelistEnforced] = useState(false);
+  const [whitelistUpdatedAt, setWhitelistUpdatedAt] = useState<string | null>(null);
+  const [newWhitelistGuildId, setNewWhitelistGuildId] = useState("");
+  const [newWhitelistGuildName, setNewWhitelistGuildName] = useState("");
+  const [newWhitelistNotes, setNewWhitelistNotes] = useState("");
 
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isSavingAdmins, setIsSavingAdmins] = useState(false);
   const [isSavingGuilds, setIsSavingGuilds] = useState(false);
+  const [isSavingWhitelist, setIsSavingWhitelist] = useState(false);
+  const [isSavingWhitelistEnforcement, setIsSavingWhitelistEnforcement] = useState(false);
 
   const sortedStatusMessages = useMemo(
-    () => [...statusMessages].sort((a, b) => a.sortOrder - b.sortOrder),
+    () => [...statusMessages].sort((left, right) => left.sortOrder - right.sortOrder),
     [statusMessages]
   );
 
   const sortedBotGuilds = useMemo(
-    () => [...botGuilds].sort((a, b) => a.guildName.localeCompare(b.guildName)),
+    () => [...botGuilds].sort((left, right) => left.guildName.localeCompare(right.guildName)),
     [botGuilds]
   );
+
+  const sortedWhitelistedGuilds = useMemo(
+    () =>
+      [...whitelistedGuilds].sort((left, right) =>
+        (left.guildName ?? left.guildId).localeCompare(right.guildName ?? right.guildId)
+      ),
+    [whitelistedGuilds]
+  );
+
+  const whitelistedGuildIds = useMemo(
+    () => new Set(whitelistedGuilds.map((item) => item.guildId)),
+    [whitelistedGuilds]
+  );
+
+  const summaryItems = useMemo(
+    () => [
+      {
+        title: "Whitelist mode",
+        value: whitelistEnforced ? "Enforced" : "Disabled",
+        description: whitelistEnforced
+          ? "Non-approved guilds are evicted automatically."
+          : "The bot can stay in any guild it joins.",
+        icon: whitelistEnforced ? ShieldCheck : ShieldAlert
+      },
+      {
+        title: "Status messages",
+        value: statusMessages.length,
+        description: "Custom presence lines available for bot rotation.",
+        icon: Activity
+      },
+      {
+        title: "Bot guilds",
+        value: botGuilds.length,
+        description: "Discord servers currently recorded for the bot.",
+        icon: Server
+      },
+      {
+        title: "Global admins",
+        value: globalAdmins.length,
+        description: "Accounts with elevated platform-wide access.",
+        icon: Crown
+      }
+    ],
+    [botGuilds.length, globalAdmins.length, statusMessages.length, whitelistEnforced]
+  );
+
+  async function reloadWhitelistState(): Promise<void> {
+    const [enforcement, guilds] = await Promise.all([
+      getAdminWhitelistEnforcement(),
+      getAdminWhitelistedGuilds()
+    ]);
+
+    setWhitelistEnforced(enforcement.enabled);
+    setWhitelistUpdatedAt(enforcement.updatedAt);
+    setWhitelistedGuilds(guilds);
+  }
+
+  async function reloadBotGuilds(): Promise<void> {
+    const guilds = await getAdminBotGuilds();
+    setBotGuilds(guilds);
+  }
 
   useEffect(() => {
     let mounted = true;
 
     async function load(): Promise<void> {
       try {
-        const [globalConfigResponse, statusResponse, admins, guilds] = await Promise.all([
+        const [
+          globalConfigResponse,
+          statusResponse,
+          admins,
+          guilds,
+          whitelistState,
+          whitelistGuildItems
+        ] = await Promise.all([
           getAdminGlobalConfig(),
           getAdminStatusMessages(),
           getAdminGlobalAdmins(),
-          getAdminBotGuilds()
+          getAdminBotGuilds(),
+          getAdminWhitelistEnforcement(),
+          getAdminWhitelistedGuilds()
         ]);
 
         if (!mounted) {
@@ -100,25 +250,26 @@ export function GlobalAdminPage() {
         setConfig(globalConfigResponse.config);
         setActivityTypes(globalConfigResponse.availableActivityTypes);
         setPlaceholders(globalConfigResponse.availablePlaceholders);
-
         setRotationEnabled(globalConfigResponse.config.rotationEnabled);
         setRotationIntervalSeconds(String(globalConfigResponse.config.rotationIntervalSeconds));
         setDefaultStatusEnabled(globalConfigResponse.config.defaultStatusEnabled);
         setDefaultStatusText(globalConfigResponse.config.defaultStatusText ?? "");
         setDefaultActivityType(globalConfigResponse.config.defaultActivityType ?? "");
-
         setStatusMessages(statusResponse.items);
         setGlobalAdmins(admins);
         setBotGuilds(guilds);
+        setWhitelistEnforced(whitelistState.enabled);
+        setWhitelistUpdatedAt(whitelistState.updatedAt);
+        setWhitelistedGuilds(whitelistGuildItems);
       } catch (error) {
         if (!mounted) {
           return;
         }
 
         if (error instanceof ApiHttpError && error.status === 403) {
-          toast.error("Global admin access is required");
+          toast.error("Global admin access is required.");
         } else {
-          toast.error(error instanceof Error ? error.message : "Failed to load admin data");
+          toast.error(error instanceof Error ? error.message : "Failed to load admin data.");
         }
       } finally {
         if (mounted) {
@@ -139,7 +290,7 @@ export function GlobalAdminPage() {
 
     const interval = Number.parseInt(rotationIntervalSeconds, 10);
     if (Number.isNaN(interval) || interval < 5 || interval > 3600) {
-      toast.error("Rotation interval must be between 5 and 3600 seconds");
+      toast.error("Rotation interval must be between 5 and 3600 seconds.");
       return;
     }
 
@@ -164,9 +315,9 @@ export function GlobalAdminPage() {
       setDefaultStatusEnabled(updated.defaultStatusEnabled);
       setDefaultStatusText(updated.defaultStatusText ?? "");
       setDefaultActivityType(updated.defaultActivityType ?? "");
-      toast.success("Global config updated");
+      toast.success("Global bot config updated.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update global config");
+      toast.error(error instanceof Error ? error.message : "Failed to update global config.");
     } finally {
       setIsSavingConfig(false);
     }
@@ -192,7 +343,7 @@ export function GlobalAdminPage() {
       const updated = await reorderAdminStatusMessages(idsInOrder);
       setStatusMessages(updated);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to reorder statuses");
+      toast.error(error instanceof Error ? error.message : "Failed to reorder statuses.");
     } finally {
       setDraggedStatusId(null);
       setDragOverStatusId(null);
@@ -204,12 +355,12 @@ export function GlobalAdminPage() {
 
     const text = statusForm.text.trim();
     if (!text) {
-      toast.error("Status text is required");
+      toast.error("Status text is required.");
       return;
     }
 
     if (!statusForm.activityType) {
-      toast.error("Select an activity type");
+      toast.error("Select an activity type.");
       return;
     }
 
@@ -227,7 +378,7 @@ export function GlobalAdminPage() {
         setStatusMessages((previous) =>
           previous.map((item) => (item.id === updated.id ? updated : item))
         );
-        toast.success("Status updated");
+        toast.success("Status updated.");
       } else {
         const created = await createAdminStatusMessage({
           text,
@@ -237,12 +388,12 @@ export function GlobalAdminPage() {
         });
 
         setStatusMessages((previous) => [...previous, created]);
-        toast.success("Status added");
+        toast.success("Status added.");
       }
 
       resetStatusForm();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to save status");
+      toast.error(error instanceof Error ? error.message : "Failed to save status.");
     } finally {
       setIsSavingStatus(false);
     }
@@ -254,9 +405,9 @@ export function GlobalAdminPage() {
       setStatusMessages((previous) =>
         previous.map((item) => (item.id === updated.id ? updated : item))
       );
-      toast.success(`Status ${updated.isEnabled ? "enabled" : "disabled"}`);
+      toast.success(`Status ${updated.isEnabled ? "enabled" : "disabled"}.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to toggle status");
+      toast.error(error instanceof Error ? error.message : "Failed to toggle status.");
     }
   }
 
@@ -272,9 +423,9 @@ export function GlobalAdminPage() {
       if (editingStatusId === message.id) {
         resetStatusForm();
       }
-      toast.success("Status deleted");
+      toast.success("Status deleted.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to delete status");
+      toast.error(error instanceof Error ? error.message : "Failed to delete status.");
     }
   }
 
@@ -358,7 +509,7 @@ export function GlobalAdminPage() {
 
     const discordId = newAdminDiscordId.trim();
     if (!/^\d+$/.test(discordId)) {
-      toast.error("Enter a valid numeric Discord user ID");
+      toast.error("Enter a valid numeric Discord user ID.");
       return;
     }
 
@@ -369,9 +520,9 @@ export function GlobalAdminPage() {
       const admins = await getAdminGlobalAdmins();
       setGlobalAdmins(admins);
       setNewAdminDiscordId("");
-      toast.success("Global admin added");
+      toast.success("Global admin added.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to add global admin");
+      toast.error(error instanceof Error ? error.message : "Failed to add global admin.");
     } finally {
       setIsSavingAdmins(false);
     }
@@ -379,7 +530,7 @@ export function GlobalAdminPage() {
 
   async function handleRemoveGlobalAdmin(admin: GlobalAdminUser): Promise<void> {
     if (admin.source === "env") {
-      toast.error("This global admin is managed by env and cannot be removed here");
+      toast.error("This global admin is managed by env and cannot be removed here.");
       return;
     }
 
@@ -394,9 +545,9 @@ export function GlobalAdminPage() {
       await removeAdminGlobalAdmin(admin.discordId);
       const admins = await getAdminGlobalAdmins();
       setGlobalAdmins(admins);
-      toast.success("Global admin removed");
+      toast.success("Global admin removed.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to remove global admin");
+      toast.error(error instanceof Error ? error.message : "Failed to remove global admin.");
     } finally {
       setIsSavingAdmins(false);
     }
@@ -408,9 +559,9 @@ export function GlobalAdminPage() {
     try {
       const guilds = await syncAdminBotGuilds();
       setBotGuilds(guilds);
-      toast.success("Bot guild list synchronized");
+      toast.success("Bot guild list synchronized.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to sync bot guilds");
+      toast.error(error instanceof Error ? error.message : "Failed to sync bot guilds.");
     } finally {
       setIsSavingGuilds(false);
     }
@@ -430,413 +581,840 @@ export function GlobalAdminPage() {
     try {
       await leaveAdminBotGuild(guild.guildId);
       setBotGuilds((previous) => previous.filter((item) => item.guildId !== guild.guildId));
-      toast.success("Bot removed from guild");
+      toast.success("Bot removed from guild.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to remove bot from guild");
+      toast.error(error instanceof Error ? error.message : "Failed to remove bot from guild.");
     } finally {
       setIsSavingGuilds(false);
     }
   }
 
+  async function handleToggleWhitelistEnforcement(nextEnabled: boolean): Promise<void> {
+    setIsSavingWhitelistEnforcement(true);
+
+    try {
+      const response = await updateAdminWhitelistEnforcement(nextEnabled);
+
+      setWhitelistEnforced(response.enabled);
+      setWhitelistUpdatedAt(response.updatedAt);
+
+      await Promise.all([reloadWhitelistState(), reloadBotGuilds()]);
+
+      if (response.enabled) {
+        const checked = response.reconciliation?.checked ?? 0;
+        const left = response.reconciliation?.left ?? 0;
+        toast.success(`Whitelist enforcement enabled. Checked ${checked} guilds and removed ${left}.`);
+      } else {
+        toast.success("Whitelist enforcement disabled.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update whitelist enforcement.");
+    } finally {
+      setIsSavingWhitelistEnforcement(false);
+    }
+  }
+
+  async function handleAddWhitelistedGuild(event: FormEvent): Promise<void> {
+    event.preventDefault();
+
+    const guildId = newWhitelistGuildId.trim();
+    const guildName = newWhitelistGuildName.trim();
+    const notes = newWhitelistNotes.trim();
+
+    if (!/^\d{17,20}$/.test(guildId)) {
+      toast.error("Enter a valid Discord guild ID.");
+      return;
+    }
+
+    setIsSavingWhitelist(true);
+
+    try {
+      await addAdminWhitelistedGuild({
+        guildId,
+        guildName: guildName || undefined,
+        notes: notes || undefined
+      });
+
+      await reloadWhitelistState();
+      setNewWhitelistGuildId("");
+      setNewWhitelistGuildName("");
+      setNewWhitelistNotes("");
+      toast.success("Guild added to whitelist.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to add guild to whitelist.");
+    } finally {
+      setIsSavingWhitelist(false);
+    }
+  }
+
+  async function handleQuickWhitelistGuild(guild: AdminBotGuild): Promise<void> {
+    setIsSavingWhitelist(true);
+
+    try {
+      await addAdminWhitelistedGuild({
+        guildId: guild.guildId,
+        guildName: guild.guildName
+      });
+
+      await reloadWhitelistState();
+      toast.success(`Added ${guild.guildName} to the whitelist.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to add guild to whitelist.");
+    } finally {
+      setIsSavingWhitelist(false);
+    }
+  }
+
+  async function handleRemoveWhitelistedGuild(item: AdminWhitelistedGuild): Promise<void> {
+    const confirmed = window.confirm(
+      `Remove guild "${item.guildName ?? item.guildId}" from the whitelist?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsSavingWhitelist(true);
+
+    try {
+      const result = await removeAdminWhitelistedGuild(item.guildId);
+      await Promise.all([reloadWhitelistState(), reloadBotGuilds()]);
+      toast.success(
+        result.evicted
+          ? `Removed ${item.guildName ?? item.guildId} and evicted the bot immediately.`
+          : `Removed ${item.guildName ?? item.guildId} from the whitelist.`
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to remove guild from whitelist.");
+    } finally {
+      setIsSavingWhitelist(false);
+    }
+  }
+
+  function getWhitelistRecordForGuild(guild: AdminBotGuild): AdminWhitelistedGuild | null {
+    return whitelistedGuilds.find((item) => item.guildId === guild.guildId) ?? null;
+  }
+
   if (!user?.isGlobalAdmin) {
     return (
-      <main className="page stack">
-        <section className="card stack">
-          <h1 style={{ margin: 0 }}>Global Admin Required</h1>
-          <p className="muted" style={{ margin: 0 }}>
-            Your account is authenticated but does not have global admin access.
-          </p>
-        </section>
-      </main>
+      <EmptyState
+        icon={LockKeyhole}
+        title="Global admin access required"
+        description="Your account is authenticated, but it does not currently have access to the platform-wide admin workspace."
+      />
     );
   }
 
   if (isLoading) {
-    return <LoadingScreen message="Loading global admin settings..." />;
+    return <LoadingScreen message="Loading global admin workspace..." />;
   }
 
   return (
-    <main className="page stack">
-      <section className="card row between">
-        <div>
-          <h1 style={{ margin: 0 }}>Global Bot Settings</h1>
-          <p className="muted" style={{ margin: "0.35rem 0 0" }}>
-            Manage rotating status, global admins, and active bot servers.
-          </p>
-        </div>
-        <div className="row">
-          <span className="badge badge-success">Global Admin</span>
-          <span className="badge badge-muted">{statusMessages.length} statuses</span>
-          <span className="badge badge-muted">{sortedBotGuilds.length} bot guilds</span>
-        </div>
-      </section>
+    <div className="flex flex-col gap-6">
+      <DashboardHeader
+        eyebrow="Platform control"
+        title="Global admin workspace"
+        description="Control bot presence, whitelist policy, rotating presence messages, and the global admin list from one production-ready console."
+        actions={
+          <>
+            <Badge variant="success">Global admin</Badge>
+            <Badge variant="secondary">{sortedStatusMessages.length} statuses</Badge>
+            <Badge variant="secondary">{sortedWhitelistedGuilds.length} whitelisted</Badge>
+          </>
+        }
+      />
 
-      <section className="grid cols-2">
-        <article className="card stack">
-          <h2 style={{ margin: 0, fontSize: "1.05rem" }}>Rotation Configuration</h2>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {summaryItems.map((item) => (
+          <SummaryCard
+            key={item.title}
+            title={item.title}
+            value={item.value}
+            description={item.description}
+            icon={item.icon}
+          />
+        ))}
+      </div>
 
-          <form className="stack" onSubmit={(event) => void handleSaveConfig(event)}>
-            <label className="row between">
-              <span>Rotation enabled</span>
-              <input
-                type="checkbox"
-                checked={rotationEnabled}
-                onChange={(event) => setRotationEnabled(event.target.checked)}
-              />
-            </label>
+      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+        <Card>
+          <CardHeader className="gap-3">
+            <CardTitle>Rotation configuration</CardTitle>
+            <CardDescription>
+              Tune the global presence loop, default activity, and fallback status text used when no
+              custom status rotation is active.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="grid gap-6 md:grid-cols-2" onSubmit={(event) => void handleSaveConfig(event)}>
+              <div className="rounded-2xl border border-border/70 bg-muted/25 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <FieldLabel htmlFor="rotation-enabled">Rotation enabled</FieldLabel>
+                    <FieldHint>Allow the bot to cycle through your configured status messages.</FieldHint>
+                  </div>
+                  <Switch
+                    id="rotation-enabled"
+                    checked={rotationEnabled}
+                    onCheckedChange={setRotationEnabled}
+                    disabled={isSavingConfig}
+                  />
+                </div>
+              </div>
 
-            <label className="stack" style={{ gap: "0.35rem" }}>
-              <span className="muted" style={{ fontSize: "0.85rem" }}>
-                Rotation interval (seconds)
-              </span>
-              <input
-                className="input"
-                value={rotationIntervalSeconds}
-                onChange={(event) => setRotationIntervalSeconds(event.target.value)}
-              />
-            </label>
+              <div className="rounded-2xl border border-border/70 bg-muted/25 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <FieldLabel htmlFor="default-status-enabled">Default status enabled</FieldLabel>
+                    <FieldHint>Fallback presence shown when no custom line should take over.</FieldHint>
+                  </div>
+                  <Switch
+                    id="default-status-enabled"
+                    checked={defaultStatusEnabled}
+                    onCheckedChange={setDefaultStatusEnabled}
+                    disabled={isSavingConfig}
+                  />
+                </div>
+              </div>
 
-            <label className="row between">
-              <span>Default status enabled</span>
-              <input
-                type="checkbox"
-                checked={defaultStatusEnabled}
-                onChange={(event) => setDefaultStatusEnabled(event.target.checked)}
-              />
-            </label>
+              <div className="space-y-2">
+                <FieldLabel htmlFor="rotation-interval">Rotation interval (seconds)</FieldLabel>
+                <Input
+                  id="rotation-interval"
+                  inputMode="numeric"
+                  value={rotationIntervalSeconds}
+                  onChange={(event) => setRotationIntervalSeconds(event.target.value)}
+                  placeholder="60"
+                />
+                <FieldHint>Allowed range: 5 to 3600 seconds.</FieldHint>
+              </div>
 
-            <label className="stack" style={{ gap: "0.35rem" }}>
-              <span className="muted" style={{ fontSize: "0.85rem" }}>Default activity type</span>
-              <select
-                className="input"
-                value={defaultActivityType}
-                onChange={(event) =>
-                  setDefaultActivityType((event.target.value || "") as BotActivityType | "")
-                }
-              >
-                <option value="">Select type...</option>
-                {activityTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="stack" style={{ gap: "0.35rem" }}>
-              <span className="muted" style={{ fontSize: "0.85rem" }}>Default status text</span>
-              <input
-                className="input"
-                value={defaultStatusText}
-                onChange={(event) => setDefaultStatusText(event.target.value)}
-                placeholder="Monitoring Kick alerts"
-              />
-            </label>
-
-            <div className="row between">
-              <span className="muted" style={{ fontSize: "0.8rem" }}>
-                Updated: {config ? new Date(config.updatedAt).toLocaleString() : "N/A"}
-              </span>
-              <button className="btn btn-primary" type="submit" disabled={isSavingConfig}>
-                {isSavingConfig ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </form>
-        </article>
-
-        <article className="card stack">
-          <h2 style={{ margin: 0, fontSize: "1.05rem" }}>Available Placeholders</h2>
-          <p className="muted" style={{ margin: 0, fontSize: "0.85rem" }}>
-            Use these variables in status text.
-          </p>
-          <div className="row" style={{ flexWrap: "wrap" }}>
-            {placeholders.map((placeholder) => (
-              <span className="badge badge-muted" key={placeholder}>
-                {placeholder}
-              </span>
-            ))}
-          </div>
-        </article>
-      </section>
-
-      <section className="card stack">
-        <h2 style={{ margin: 0, fontSize: "1.05rem" }}>
-          {editingStatusId ? "Edit Status Message" : "Add Status Message"}
-        </h2>
-        <p className="muted" style={{ margin: 0, fontSize: "0.85rem" }}>
-          Drag the grip handle in the order column to reorder status messages with the mouse.
-        </p>
-
-        <form className="grid cols-2" onSubmit={(event) => void handleSubmitStatus(event)}>
-          <label className="stack" style={{ gap: "0.35rem" }}>
-            <span className="muted" style={{ fontSize: "0.85rem" }}>Status text</span>
-            <input
-              className="input"
-              value={statusForm.text}
-              onChange={(event) =>
-                setStatusForm((previous) => ({ ...previous, text: event.target.value }))
-              }
-              placeholder="Watching {trackedStreamerCount} streamers"
-            />
-          </label>
-
-          <label className="stack" style={{ gap: "0.35rem" }}>
-            <span className="muted" style={{ fontSize: "0.85rem" }}>Activity type</span>
-            <select
-              className="input"
-              value={statusForm.activityType}
-              onChange={(event) =>
-                setStatusForm((previous) => ({
-                  ...previous,
-                  activityType: (event.target.value || "") as BotActivityType | ""
-                }))
-              }
-            >
-              <option value="">Select type...</option>
-              {activityTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="row between">
-            <span>Enabled</span>
-            <input
-              type="checkbox"
-              checked={statusForm.isEnabled}
-              onChange={(event) =>
-                setStatusForm((previous) => ({ ...previous, isEnabled: event.target.checked }))
-              }
-            />
-          </label>
-
-          <label className="row between">
-            <span>Use placeholders</span>
-            <input
-              type="checkbox"
-              checked={statusForm.usePlaceholders}
-              onChange={(event) =>
-                setStatusForm((previous) => ({
-                  ...previous,
-                  usePlaceholders: event.target.checked
-                }))
-              }
-            />
-          </label>
-
-          <div className="row" style={{ justifyContent: "flex-end", gridColumn: "1 / -1" }}>
-            {editingStatusId ? (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={resetStatusForm}
-                disabled={isSavingStatus}
-              >
-                Cancel Edit
-              </button>
-            ) : null}
-            <button className="btn btn-primary" type="submit" disabled={isSavingStatus}>
-              {isSavingStatus ? "Saving..." : editingStatusId ? "Update" : "Add Status"}
-            </button>
-          </div>
-        </form>
-
-        {sortedStatusMessages.length === 0 ? (
-          <p className="muted" style={{ margin: 0 }}>
-            No status messages configured yet.
-          </p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Order</th>
-                <th>Text</th>
-                <th>Type</th>
-                <th>Enabled</th>
-                <th>Placeholders</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedStatusMessages.map((message, index) => (
-                <tr
-                  key={message.id}
-                  onDragOver={(event) => handleStatusDragOver(event, message.id)}
-                  onDrop={(event) => void handleStatusDrop(event, message.id)}
-                  style={{
-                    backgroundColor:
-                      dragOverStatusId === message.id && draggedStatusId !== message.id
-                        ? "hsl(var(--secondary))"
-                        : undefined
-                  }}
+              <div className="space-y-2">
+                <FieldLabel htmlFor="default-activity">Default activity type</FieldLabel>
+                <Select
+                  value={defaultActivityType === "" ? "__empty__" : defaultActivityType}
+                  onValueChange={(value) =>
+                    setDefaultActivityType(value === "__empty__" ? "" : (value as BotActivityType))
+                  }
                 >
-                  <td>
-                    <div className="row" style={{ gap: "0.5rem" }}>
-                      <button
-                        type="button"
-                        draggable
-                        className="btn btn-secondary"
-                        aria-label={`Drag to reorder ${message.text}`}
-                        onDragStart={(event) => handleStatusDragStart(event, message.id)}
-                        onDragEnd={handleStatusDragEnd}
-                        style={{ padding: "0.45rem", cursor: "grab" }}
-                      >
-                        <GripVertical size={16} />
-                      </button>
-                      <span>{message.sortOrder}</span>
-                    </div>
-                  </td>
-                  <td>{message.text}</td>
-                  <td>{message.activityType}</td>
-                  <td>
-                    <span className={`badge ${message.isEnabled ? "badge-success" : "badge-muted"}`}>
-                      {message.isEnabled ? "Enabled" : "Disabled"}
-                    </span>
-                  </td>
-                  <td>{message.usePlaceholders ? "Yes" : "No"}</td>
-                  <td>
-                    <div className="row" style={{ flexWrap: "wrap" }}>
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => void moveStatus(message.id, -1)}
-                        disabled={index === 0}
-                      >
-                        Up
-                      </button>
-                      <button
-                        className="btn btn-secondary"
-                        onClick={() => void moveStatus(message.id, 1)}
-                        disabled={index === sortedStatusMessages.length - 1}
-                      >
-                        Down
-                      </button>
-                      <button className="btn btn-secondary" onClick={() => startEditStatus(message)}>
-                        Edit
-                      </button>
-                      <button className="btn btn-secondary" onClick={() => void handleToggleStatus(message)}>
-                        {message.isEnabled ? "Disable" : "Enable"}
-                      </button>
-                      <button className="btn btn-danger" onClick={() => void handleDeleteStatus(message)}>
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                  <SelectTrigger id="default-activity">
+                    <SelectValue placeholder="Select activity type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__empty__">No default activity</SelectItem>
+                    {activityTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <FieldLabel htmlFor="default-status-text">Default status text</FieldLabel>
+                <Input
+                  id="default-status-text"
+                  value={defaultStatusText}
+                  onChange={(event) => setDefaultStatusText(event.target.value)}
+                  placeholder="Monitoring Kick alerts"
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-4 md:col-span-2">
+                <FieldHint>
+                  Last updated {config ? formatDateTime(config.updatedAt) : "Not available"}.
+                </FieldHint>
+                <Button type="submit" disabled={isSavingConfig}>
+                  <Save data-icon="inline-start" />
+                  {isSavingConfig ? "Saving..." : "Save config"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="gap-3">
+            <CardTitle>Available placeholders</CardTitle>
+            <CardDescription>
+              Reuse dynamic values in status text without hardcoding counts or bot metadata.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {placeholders.map((placeholder) => (
+                <Badge key={placeholder} variant="outline">
+                  {placeholder}
+                </Badge>
               ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+            </div>
+            <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4">
+              <p className="text-sm text-muted-foreground">
+                Use these in rotating status lines or the default presence text to surface guild,
+                streamer, and user metrics automatically.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-      <section className="grid cols-2">
-        <article className="card stack">
-          <h2 style={{ margin: 0, fontSize: "1.05rem" }}>Global Admin Users</h2>
-
-          <form className="row" onSubmit={(event) => void handleAddGlobalAdmin(event)}>
-            <input
-              className="input"
-              value={newAdminDiscordId}
-              onChange={(event) => setNewAdminDiscordId(event.target.value)}
-              placeholder="Discord user ID"
-            />
-            <button className="btn btn-primary" type="submit" disabled={isSavingAdmins}>
-              Add
-            </button>
-          </form>
-
-          {globalAdmins.length === 0 ? (
-            <p className="muted" style={{ margin: 0 }}>No global admins configured.</p>
-          ) : (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Discord ID</th>
-                  <th>Source</th>
-                  <th>Created</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {globalAdmins.map((admin) => (
-                  <tr key={admin.discordId}>
-                    <td>{admin.discordId}</td>
-                    <td>{admin.source}</td>
-                    <td>{admin.createdAt ? new Date(admin.createdAt).toLocaleString() : "-"}</td>
-                    <td>
-                      {admin.discordId === user?.id ? (
-                        <span className="muted">Current user</span>
-                      ) : admin.source === "env" ? (
-                        <span className="muted">Managed in env</span>
-                      ) : (
-                        <button
-                          className="btn btn-danger"
-                          onClick={() => void handleRemoveGlobalAdmin(admin)}
-                          disabled={isSavingAdmins}
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </article>
-
-        <article className="card stack">
-          <div className="row between">
-            <h2 style={{ margin: 0, fontSize: "1.05rem" }}>Bot Servers</h2>
-            <button
-              className="btn btn-secondary"
-              onClick={() => void handleSyncBotGuilds()}
-              disabled={isSavingGuilds}
-            >
-              {isSavingGuilds ? "Syncing..." : "Sync"}
-            </button>
+      <Card>
+        <CardHeader className="gap-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle>Status message rotation</CardTitle>
+              <CardDescription>
+                Create, reorder, enable, and maintain the bot’s rotating presence messages.
+              </CardDescription>
+            </div>
+            <Badge variant="secondary">{sortedStatusMessages.length} saved lines</Badge>
           </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+            <div className="space-y-4 rounded-[24px] border border-border/70 bg-muted/20 p-5">
+              <div className="space-y-1">
+                <h3 className="text-base font-semibold text-foreground">
+                  {editingStatusId ? "Edit status message" : "Add status message"}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Build reusable activity lines and preserve placeholders when you want counts to stay live.
+                </p>
+              </div>
 
-          {sortedBotGuilds.length === 0 ? (
-            <p className="muted" style={{ margin: 0 }}>Bot is not recorded in any guild yet.</p>
-          ) : (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Guild</th>
-                  <th>Alert Channel</th>
-                  <th>Tracked</th>
-                  <th>Last Seen</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedBotGuilds.map((guild) => (
-                  <tr key={guild.guildId}>
-                    <td>
-                      <strong>{guild.guildName}</strong>
-                      <div className="muted" style={{ fontSize: "0.8rem" }}>{guild.guildId}</div>
-                    </td>
-                    <td>{guild.configuredAlertChannelId ?? "Not configured"}</td>
-                    <td>{guild.trackedStreamerCount}</td>
-                    <td>{new Date(guild.lastSeenAt).toLocaleString()}</td>
-                    <td>
-                      <button
-                        className="btn btn-danger"
-                        onClick={() => void handleLeaveBotGuild(guild)}
-                        disabled={isSavingGuilds}
+              <form className="space-y-4" onSubmit={(event) => void handleSubmitStatus(event)}>
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="status-text">Status text</FieldLabel>
+                  <Input
+                    id="status-text"
+                    value={statusForm.text}
+                    onChange={(event) =>
+                      setStatusForm((previous) => ({ ...previous, text: event.target.value }))
+                    }
+                    placeholder="Watching {trackedStreamerCount} streamers"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="status-activity-type">Activity type</FieldLabel>
+                  <Select
+                    value={statusForm.activityType === "" ? "__empty__" : statusForm.activityType}
+                    onValueChange={(value) =>
+                      setStatusForm((previous) => ({
+                        ...previous,
+                        activityType: value === "__empty__" ? "" : (value as BotActivityType)
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="status-activity-type">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__empty__">Select type</SelectItem>
+                      {activityTypes.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1">
+                        <FieldLabel htmlFor="status-enabled">Enabled</FieldLabel>
+                        <FieldHint>Keep this line active in the rotation.</FieldHint>
+                      </div>
+                      <Switch
+                        id="status-enabled"
+                        checked={statusForm.isEnabled}
+                        onCheckedChange={(checked) =>
+                          setStatusForm((previous) => ({ ...previous, isEnabled: checked }))
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1">
+                        <FieldLabel htmlFor="status-placeholders">Use placeholders</FieldLabel>
+                        <FieldHint>Allow dynamic guild and streamer metrics to render live.</FieldHint>
+                      </div>
+                      <Switch
+                        id="status-placeholders"
+                        checked={statusForm.usePlaceholders}
+                        onCheckedChange={(checked) =>
+                          setStatusForm((previous) => ({ ...previous, usePlaceholders: checked }))
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap justify-end gap-3">
+                  {editingStatusId ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={resetStatusForm}
+                      disabled={isSavingStatus}
+                    >
+                      Cancel
+                    </Button>
+                  ) : null}
+                  <Button type="submit" disabled={isSavingStatus}>
+                    <Save data-icon="inline-start" />
+                    {isSavingStatus ? "Saving..." : editingStatusId ? "Update status" : "Add status"}
+                  </Button>
+                </div>
+              </form>
+            </div>
+
+            {sortedStatusMessages.length === 0 ? (
+              <EmptyState
+                icon={Activity}
+                title="No status messages yet"
+                description="Add your first rotating presence line to give the bot a more polished identity across every guild."
+              />
+            ) : (
+              <div className="rounded-[24px] border border-border/70 bg-muted/10 p-2">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Order</TableHead>
+                      <TableHead>Text</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>State</TableHead>
+                      <TableHead>Placeholders</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedStatusMessages.map((message, index) => (
+                      <TableRow
+                        key={message.id}
+                        onDragOver={(event) => handleStatusDragOver(event, message.id)}
+                        onDrop={(event) => void handleStatusDrop(event, message.id)}
+                        className={cn(
+                          dragOverStatusId === message.id &&
+                            draggedStatusId !== message.id &&
+                            "bg-muted/80"
+                        )}
                       >
-                        Leave
-                      </button>
-                    </td>
-                  </tr>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="outline"
+                              draggable
+                              className="size-8 cursor-grab"
+                              aria-label={`Drag to reorder ${message.text}`}
+                              onDragStart={(event) => handleStatusDragStart(event, message.id)}
+                              onDragEnd={handleStatusDragEnd}
+                            >
+                              <GripVertical className="size-4" />
+                            </Button>
+                            <span className="text-sm text-muted-foreground">{message.sortOrder}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">{message.text}</TableCell>
+                        <TableCell>{message.activityType}</TableCell>
+                        <TableCell>
+                          <Badge variant={message.isEnabled ? "success" : "secondary"}>
+                            {message.isEnabled ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{message.usePlaceholders ? "Yes" : "No"}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void moveStatus(message.id, -1)}
+                              disabled={index === 0}
+                            >
+                              Up
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void moveStatus(message.id, 1)}
+                              disabled={index === sortedStatusMessages.length - 1}
+                            >
+                              Down
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => startEditStatus(message)}>
+                              Edit
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void handleToggleStatus(message)}
+                            >
+                              {message.isEnabled ? "Disable" : "Enable"}
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => void handleDeleteStatus(message)}
+                            >
+                              <Trash2 data-icon="inline-start" />
+                              Delete
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card>
+          <CardHeader className="gap-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <CardTitle>Guild whitelist policy</CardTitle>
+                <CardDescription>
+                  Keep stream alerts untouched while deciding which guilds the bot is allowed to stay in.
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={whitelistEnforced ? "success" : "secondary"}>
+                  {whitelistEnforced ? "Enforced" : "Disabled"}
+                </Badge>
+                <Badge variant="outline">
+                  Updated {whitelistUpdatedAt ? formatDateTime(whitelistUpdatedAt) : "never"}
+                </Badge>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="rounded-[24px] border border-border/70 bg-muted/20 p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <FieldLabel htmlFor="whitelist-enforcement">Auto-leave non-whitelisted guilds</FieldLabel>
+                  <FieldHint>
+                    When enabled, the bot leaves unapproved guilds during joins and reconciliation.
+                  </FieldHint>
+                </div>
+                <Switch
+                  id="whitelist-enforcement"
+                  checked={whitelistEnforced}
+                  onCheckedChange={(checked) => void handleToggleWhitelistEnforcement(checked)}
+                  disabled={isSavingWhitelistEnforcement}
+                />
+              </div>
+            </div>
+
+            <form className="space-y-4 rounded-[24px] border border-border/70 bg-muted/10 p-5" onSubmit={(event) => void handleAddWhitelistedGuild(event)}>
+              <div className="space-y-1">
+                <h3 className="text-base font-semibold text-foreground">Add whitelisted guild</h3>
+                <p className="text-sm text-muted-foreground">
+                  Enter a guild ID directly or use quick allow actions from the active bot guild list.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="whitelist-guild-id">Guild ID</FieldLabel>
+                  <Input
+                    id="whitelist-guild-id"
+                    value={newWhitelistGuildId}
+                    onChange={(event) => setNewWhitelistGuildId(event.target.value)}
+                    placeholder="123456789012345678"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <FieldLabel htmlFor="whitelist-guild-name">Guild name</FieldLabel>
+                  <Input
+                    id="whitelist-guild-name"
+                    value={newWhitelistGuildName}
+                    onChange={(event) => setNewWhitelistGuildName(event.target.value)}
+                    placeholder="Streamer HQ"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <FieldLabel htmlFor="whitelist-guild-notes">Notes</FieldLabel>
+                <Textarea
+                  id="whitelist-guild-notes"
+                  value={newWhitelistNotes}
+                  onChange={(event) => setNewWhitelistNotes(event.target.value)}
+                  placeholder="Primary production guild, partner community, or managed test server."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <Button type="submit" disabled={isSavingWhitelist}>
+                  <Plus data-icon="inline-start" />
+                  {isSavingWhitelist ? "Adding..." : "Add to whitelist"}
+                </Button>
+              </div>
+            </form>
+
+            {sortedWhitelistedGuilds.length === 0 ? (
+              <EmptyState
+                icon={ShieldEllipsis}
+                title="No guilds whitelisted yet"
+                description="Add the guilds you trust, then enable enforcement whenever you want the bot to stay inside that approved set only."
+              />
+            ) : (
+              <div className="rounded-[24px] border border-border/70 bg-muted/10 p-2">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Guild</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead>Added</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedWhitelistedGuilds.map((guild) => {
+                      const inBotGuilds = botGuilds.some((item) => item.guildId === guild.guildId);
+
+                      return (
+                        <TableRow key={guild.id}>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <p className="font-medium text-foreground">{guild.guildName ?? guild.guildId}</p>
+                              <p className="text-xs text-muted-foreground">{guild.guildId}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>{guild.notes ?? "No notes"}</TableCell>
+                          <TableCell>{formatDateTime(guild.createdAt)}</TableCell>
+                          <TableCell>
+                            <Badge variant={inBotGuilds ? "success" : "secondary"}>
+                              {inBotGuilds ? "Bot present" : "Not currently joined"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => void handleRemoveWhitelistedGuild(guild)}
+                              disabled={isSavingWhitelist}
+                            >
+                              <Trash2 data-icon="inline-start" />
+                              Remove
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="gap-3">
+            <CardTitle>Global admins</CardTitle>
+            <CardDescription>
+              Add or remove platform-wide admin access without touching the env-managed list.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <form className="flex flex-col gap-3 sm:flex-row" onSubmit={(event) => void handleAddGlobalAdmin(event)}>
+              <Input
+                value={newAdminDiscordId}
+                onChange={(event) => setNewAdminDiscordId(event.target.value)}
+                placeholder="Discord user ID"
+              />
+              <Button type="submit" disabled={isSavingAdmins}>
+                <UserCog data-icon="inline-start" />
+                Add admin
+              </Button>
+            </form>
+
+            {globalAdmins.length === 0 ? (
+              <EmptyState
+                icon={Crown}
+                title="No global admins configured"
+                description="Add trusted operator accounts here or manage them through the environment variable when you need immutable bootstrap access."
+              />
+            ) : (
+              <div className="space-y-3">
+                {globalAdmins.map((admin) => (
+                  <div
+                    key={admin.discordId}
+                    className="flex flex-col gap-4 rounded-[24px] border border-border/70 bg-muted/10 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="space-y-1">
+                      <p className="font-medium text-foreground">{admin.discordId}</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant={admin.source === "env" ? "outline" : "secondary"}>
+                          {admin.source === "env" ? "Env-managed" : "Database"}
+                        </Badge>
+                        {admin.discordId === user?.id ? <Badge variant="success">Current user</Badge> : null}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {admin.createdAt ? `Added ${formatDateTime(admin.createdAt)}` : "Provisioned outside the dashboard"}
+                      </p>
+                    </div>
+
+                    {admin.discordId === user?.id ? (
+                      <Badge variant="outline">Protected</Badge>
+                    ) : admin.source === "env" ? (
+                      <Badge variant="outline">Managed in env</Badge>
+                    ) : (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => void handleRemoveGlobalAdmin(admin)}
+                        disabled={isSavingAdmins}
+                      >
+                        <Trash2 data-icon="inline-start" />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="gap-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle>Bot guild inventory</CardTitle>
+              <CardDescription>
+                Review every guild the bot currently knows about, see whether it is approved, and take action immediately.
+              </CardDescription>
+            </div>
+            <Button variant="outline" onClick={() => void handleSyncBotGuilds()} disabled={isSavingGuilds}>
+              <RefreshCcw data-icon="inline-start" />
+              {isSavingGuilds ? "Syncing..." : "Sync guilds"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {sortedBotGuilds.length === 0 ? (
+            <EmptyState
+              icon={Server}
+              title="No bot guilds recorded"
+              description="Sync the guild inventory once the bot is online, and this list will show live Discord server membership and approval status."
+            />
+          ) : (
+            <div className="rounded-[24px] border border-border/70 bg-muted/10 p-2">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Guild</TableHead>
+                    <TableHead>Whitelist</TableHead>
+                    <TableHead>Alert channel</TableHead>
+                    <TableHead>Tracked</TableHead>
+                    <TableHead>Last seen</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedBotGuilds.map((guild) => {
+                    const whitelistedRecord = getWhitelistRecordForGuild(guild);
+                    const isWhitelisted = Boolean(whitelistedRecord);
+
+                    return (
+                      <TableRow key={guild.guildId}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <GuildAvatar
+                              name={guild.guildName}
+                              iconUrl={guild.iconUrl}
+                              initials={getInitials(guild.guildName)}
+                              className="size-10"
+                            />
+                            <div className="space-y-1">
+                              <p className="font-medium text-foreground">{guild.guildName}</p>
+                              <p className="text-xs text-muted-foreground">{guild.guildId}</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <Badge variant={isWhitelisted ? "success" : "secondary"}>
+                              {isWhitelisted ? "Allowed" : "Not allowed"}
+                            </Badge>
+                            {whitelistEnforced && !isWhitelisted ? (
+                              <p className="text-xs text-muted-foreground">
+                                Will be removed when the next whitelist check runs.
+                              </p>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell>{guild.configuredAlertChannelId ?? "Not configured"}</TableCell>
+                        <TableCell>{guild.trackedStreamerCount}</TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <p>{formatDateTime(guild.lastSeenAt)}</p>
+                            <p className="text-xs text-muted-foreground">{formatRelativeTime(guild.lastSeenAt)}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            {isWhitelisted && whitelistedRecord ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void handleRemoveWhitelistedGuild(whitelistedRecord)}
+                                disabled={isSavingWhitelist}
+                              >
+                                Remove from whitelist
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void handleQuickWhitelistGuild(guild)}
+                                disabled={isSavingWhitelist}
+                              >
+                                Allow guild
+                              </Button>
+                            )}
+
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => void handleLeaveBotGuild(guild)}
+                              disabled={isSavingGuilds}
+                            >
+                              Leave guild
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
-        </article>
-      </section>
-    </main>
+        </CardContent>
+        <CardFooter className="justify-between border-t border-border/70 pt-5">
+          <FieldHint>
+            Use quick allow actions here when a trusted guild invites the bot and you want to keep it
+            before turning whitelist enforcement on.
+          </FieldHint>
+          <Badge variant="outline">{botGuilds.length} known guilds</Badge>
+        </CardFooter>
+      </Card>
+    </div>
   );
 }
