@@ -23,6 +23,22 @@ interface DashboardTopbarProps {
 }
 
 function getPageMeta(pathname: string) {
+  if (pathname.includes("/admin/whitelist")) {
+    return { section: "Admin", title: "Guild whitelist" };
+  }
+
+  if (pathname.includes("/admin/guilds")) {
+    return { section: "Admin", title: "Bot guild inventory" };
+  }
+
+  if (pathname.includes("/admin/presence")) {
+    return { section: "Admin", title: "Presence and rotation" };
+  }
+
+  if (pathname.includes("/admin/access")) {
+    return { section: "Admin", title: "Admin access" };
+  }
+
   if (pathname.includes("/setup")) {
     return { section: "Setup", title: "Guided onboarding" };
   }

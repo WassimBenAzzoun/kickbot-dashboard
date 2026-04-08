@@ -276,7 +276,7 @@ export function OverviewPage() {
                       <Badge variant={guild.alertChannelId ? "default" : "secondary"}>
                         {guild.alertChannelId ? "Channel configured" : "Channel missing"}
                       </Badge>
-                      <Badge variant="outline">{guild.userCanManage ? "Manage access" : "Read only"}</Badge>
+                      <Badge variant="outline">{guild.userCanManage ? "Manageable" : "Read only"}</Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="flex flex-wrap gap-2">
@@ -286,6 +286,15 @@ export function OverviewPage() {
                     <Button asChild variant="outline" className="flex-1">
                       <Link to={buildGuildRoute(guild.id, "streamers")}>Streamers</Link>
                     </Button>
+                    {user?.isGlobalAdmin ? (
+                      <Button asChild variant="outline" className="flex-1">
+                        <Link
+                          to={`/dashboard/admin/whitelist?guildId=${encodeURIComponent(guild.id)}&guildName=${encodeURIComponent(guild.name)}`}
+                        >
+                          Manage access
+                        </Link>
+                      </Button>
+                    ) : null}
                     <Button asChild className="w-full">
                       <Link to={buildGuildRoute(guild.id, "notifications")}>Open notifications</Link>
                     </Button>

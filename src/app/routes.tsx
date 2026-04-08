@@ -31,6 +31,18 @@ const AccountPage = lazy(async () => ({
 const GlobalAdminPage = lazy(async () => ({
   default: (await import("./pages/GlobalAdminPage")).GlobalAdminPage
 }));
+const AdminWhitelistPage = lazy(async () => ({
+  default: (await import("./pages/AdminWhitelistPage")).AdminWhitelistPage
+}));
+const AdminBotGuildsPage = lazy(async () => ({
+  default: (await import("./pages/AdminBotGuildsPage")).AdminBotGuildsPage
+}));
+const AdminPresencePage = lazy(async () => ({
+  default: (await import("./pages/AdminPresencePage")).AdminPresencePage
+}));
+const AdminAccessPage = lazy(async () => ({
+  default: (await import("./pages/AdminAccessPage")).AdminAccessPage
+}));
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
   const { isLoading, isAuthenticated } = useAuth();
@@ -93,6 +105,38 @@ export function AppRoutes() {
             element={
               <GlobalAdminRoute>
                 <GlobalAdminPage />
+              </GlobalAdminRoute>
+            }
+          />
+          <Route
+            path="admin/whitelist"
+            element={
+              <GlobalAdminRoute>
+                <AdminWhitelistPage />
+              </GlobalAdminRoute>
+            }
+          />
+          <Route
+            path="admin/guilds"
+            element={
+              <GlobalAdminRoute>
+                <AdminBotGuildsPage />
+              </GlobalAdminRoute>
+            }
+          />
+          <Route
+            path="admin/presence"
+            element={
+              <GlobalAdminRoute>
+                <AdminPresencePage />
+              </GlobalAdminRoute>
+            }
+          />
+          <Route
+            path="admin/access"
+            element={
+              <GlobalAdminRoute>
+                <AdminAccessPage />
               </GlobalAdminRoute>
             }
           />

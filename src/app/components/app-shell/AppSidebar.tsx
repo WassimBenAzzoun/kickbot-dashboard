@@ -3,6 +3,7 @@ import {
   BellRing,
   LayoutDashboard,
   MoonStar,
+  ShieldCheck,
   Settings2,
   Sparkles,
   SunMedium,
@@ -237,13 +238,43 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
                 onNavigate={onNavigate}
               />
               {user?.isGlobalAdmin ? (
-                <SidebarLink
-                  to="/dashboard/admin"
-                  label="Global admin"
-                  icon={Wrench}
-                  activeWhen={(pathname) => pathname.includes("/admin")}
-                  onNavigate={onNavigate}
-                />
+                <>
+                  <SidebarLink
+                    to="/dashboard/admin"
+                    label="Admin home"
+                    icon={Wrench}
+                    activeWhen={(pathname) => pathname === "/dashboard/admin"}
+                    onNavigate={onNavigate}
+                  />
+                  <SidebarLink
+                    to="/dashboard/admin/whitelist"
+                    label="Whitelist"
+                    icon={ShieldCheck}
+                    activeWhen={(pathname) => pathname.includes("/admin/whitelist")}
+                    onNavigate={onNavigate}
+                  />
+                  <SidebarLink
+                    to="/dashboard/admin/guilds"
+                    label="Bot guilds"
+                    icon={UsersRound}
+                    activeWhen={(pathname) => pathname.includes("/admin/guilds")}
+                    onNavigate={onNavigate}
+                  />
+                  <SidebarLink
+                    to="/dashboard/admin/presence"
+                    label="Presence"
+                    icon={Sparkles}
+                    activeWhen={(pathname) => pathname.includes("/admin/presence")}
+                    onNavigate={onNavigate}
+                  />
+                  <SidebarLink
+                    to="/dashboard/admin/access"
+                    label="Admin access"
+                    icon={UserCircle2}
+                    activeWhen={(pathname) => pathname.includes("/admin/access")}
+                    onNavigate={onNavigate}
+                  />
+                </>
               ) : null}
             </div>
           </div>
