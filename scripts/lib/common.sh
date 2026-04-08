@@ -106,9 +106,16 @@ sync_dist_if_configured() {
     return 0
   fi
 
-  check_command rsync
   install -d -m 755 "${FRONTEND_DEPLOY_TARGET_DIR}"
-  rsync -a --delete "${APP_DIR}/dist/" "${FRONTEND_DEPLOY_TARGET_DIR}/"
+
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete "${APP_DIR}/dist/" "${FRONTEND_DEPLOY_TARGET_DIR}/"
+  else
+    log_warning "rsync is not installed; falling back to cp-based sync."
+    find "${FRONTEND_DEPLOY_TARGET_DIR}" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+    cp -a "${APP_DIR}/dist/." "${FRONTEND_DEPLOY_TARGET_DIR}/"
+  fi
+
   log_success "Synced frontend build to ${FRONTEND_DEPLOY_TARGET_DIR}."
 }
 

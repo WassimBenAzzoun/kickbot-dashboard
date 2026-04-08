@@ -26,6 +26,6 @@ jobs:
           script: |
             set -e
             cd "${{ secrets.VPS_APP_DIR }}"
-            chmod +x scripts/*.sh
-            chmod +x scripts/lib/*.sh
-            ./scripts/update.sh --force
+            export FRONTEND_DEPLOY_TARGET_DIR="/var/www/kickbot-dashboard"
+            export FRONTEND_POST_DEPLOY_CMD="systemctl reload caddy"
+            bash ./scripts/update.sh --force
