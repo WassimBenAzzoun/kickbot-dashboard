@@ -87,7 +87,7 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
   const primaryGuild = getPrimaryGuild(guilds, location.pathname);
 
   return (
-    <div className="flex h-full min-h-screen bg-sidebar text-sidebar-foreground">
+    <div className="flex h-full min-h-screen overflow-hidden bg-sidebar text-sidebar-foreground">
       <div className="flex w-20 flex-col items-center gap-5 border-r border-sidebar-border px-3 py-4">
         <Link
           to="/dashboard/overview"
@@ -137,7 +137,7 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col px-4 py-4">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col px-4 py-4">
         <div className="space-y-1 px-2">
           <p className="font-display text-lg font-semibold text-sidebar-foreground">KickBot Console</p>
           <p className="text-sm text-muted-foreground">
@@ -180,7 +180,8 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
           )}
         </div>
 
-        <div className="mt-6 flex-1 space-y-6">
+        <div className="mt-6 min-h-0 flex-1 overflow-y-auto pr-1">
+          <div className="space-y-6 pb-6">
           <div className="space-y-2">
             <p className="px-2 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
               Workspace
@@ -279,8 +280,9 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
             </div>
           </div>
         </div>
+        </div>
 
-        <div className="space-y-3 border-t border-sidebar-border pt-4">
+        <div className="mt-auto space-y-3 border-t border-sidebar-border pt-4">
           <div className="flex items-center gap-3 px-2">
             <Avatar className="size-10 rounded-2xl border border-border/70">
               {user?.avatarUrl ? <AvatarImage src={user.avatarUrl} alt={user.username} /> : null}
