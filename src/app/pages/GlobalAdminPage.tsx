@@ -6,9 +6,8 @@ import {
   ApiHttpError,
   getAdminBotGuilds,
   getAdminGlobalAdmins,
-  getAdminStatusMessages,
-  getAdminWhitelistedGuilds,
-  getAdminWhitelistEnforcement
+  getAdminPresenceMessages,
+  getAdminSettings
 } from "@/app/lib/api";
 import { DashboardHeader } from "@/app/components/shared/DashboardHeader";
 import { SummaryCard } from "@/app/components/shared/SummaryCard";
@@ -30,23 +29,22 @@ export function GlobalAdminPage() {
 
     async function load(): Promise<void> {
       try {
-        const [statusResponse, admins, guilds, whitelistGuilds, whitelistState] = await Promise.all([
-          getAdminStatusMessages(),
+        const [statusMessages, admins, guilds, settings] = await Promise.all([
+          getAdminPresenceMessages(),
           getAdminGlobalAdmins(),
           getAdminBotGuilds(),
-          getAdminWhitelistedGuilds(),
-          getAdminWhitelistEnforcement()
+          getAdminSettings()
         ]);
 
         if (!mounted) {
           return;
         }
 
-        setStatusCount(statusResponse.items.length);
+        setStatusCount(statusMessages.length);
         setGlobalAdminCount(admins.length);
         setBotGuildCount(guilds.length);
-        setWhitelistCount(whitelistGuilds.length);
-        setWhitelistEnforced(whitelistState.enabled);
+        setWhitelistCount(guilds.filter((guild) => guild.isAllowed).length);
+        setWhitelistEnforced(settings.allowlistEnforced);
       } catch (error) {
         if (!mounted) {
           return;

@@ -1,4 +1,4 @@
-﻿export interface AuthUser {
+export interface AuthUser {
   id: string;
   username: string;
   globalName: string | null;
@@ -6,41 +6,58 @@
   isGlobalAdmin: boolean;
 }
 
+export type GuildMembershipState = "UNKNOWN" | "CONNECTED" | "LEFT";
+
 export interface DashboardGuild {
-  guildId: string;
-  guildName: string;
-  iconUrl: string | null;
-  userCanManage: boolean;
-  botInGuild: boolean | null;
-  configuredAlertChannelId: string | null;
+  id: string;
+  name: string;
+  iconHash: string | null;
+  configured: boolean;
+  alertChannelId: string | null;
+  isAllowed: boolean;
+  membershipState: GuildMembershipState;
   trackedStreamerCount: number;
 }
 
-export interface GuildConfig {
-  guildId: string;
+export interface DiscordGuild {
+  id: string;
+  name: string | null;
+  iconHash: string | null;
+  membershipState: GuildMembershipState;
   alertChannelId: string | null;
+  isAllowed: boolean;
+  allowlistNotes: string | null;
+  allowedByDiscordUserId: string | null;
+  allowedAt: string | null;
+  joinedAt: string | null;
+  leftAt: string | null;
+  lastSeenAt: string | null;
+  createdAt: string;
   updatedAt: string;
 }
+
+export type GuildConfig = DiscordGuild;
 
 export interface GuildChannel {
   id: string;
   name: string;
-  type: "GUILD_TEXT" | "GUILD_ANNOUNCEMENT";
+  type: number;
 }
 
-export interface GuildChannelsResponse {
-  items: GuildChannel[];
-  total: number;
-  source: "bot_api" | "unavailable";
+export interface Collection<T> {
+  items: T[];
+  page: { nextCursor: string | null; hasMore: boolean };
 }
 
 export interface Streamer {
   id: string;
   guildId: string;
   platform: "KICK";
-  streamerUsername: string;
-  isActive: boolean;
+  username: string;
+  normalizedUsername: string;
+  enabled: boolean;
   lastKnownLiveState: boolean;
+  currentLiveStartedAt: string | null;
   lastNotifiedLiveAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -49,25 +66,27 @@ export interface Streamer {
 export interface NotificationItem {
   id: string;
   guildId: string;
+  streamerId: string | null;
   streamerUsername: string;
-  platform: string;
-  status: string;
-  messageId: string | null;
+  normalizedUsername: string;
+  platform: "KICK";
+  status: "LIVE";
+  streamUrl: string;
+  title: string | null;
+  category: string | null;
+  thumbnailUrl: string | null;
+  viewerCount: number | null;
+  streamStartedAt: string;
+  discordMessageId: string | null;
   sentAt: string;
 }
 
-export interface PaginatedNotifications {
-  items: NotificationItem[];
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-}
-
+export type NotificationPage = Collection<NotificationItem>;
 export type BotActivityType = "PLAYING" | "WATCHING" | "LISTENING" | "COMPETING" | "CUSTOM";
 
-export interface GlobalBotConfig {
-  id: string;
+export interface BotSettings {
+  id: "default";
+  allowlistEnforced: boolean;
   rotationEnabled: boolean;
   rotationIntervalSeconds: number;
   defaultStatusEnabled: boolean;
@@ -77,11 +96,13 @@ export interface GlobalBotConfig {
   updatedAt: string;
 }
 
+export type GlobalBotConfig = BotSettings;
+
 export interface BotStatusMessage {
   id: string;
   text: string;
   activityType: BotActivityType;
-  isEnabled: boolean;
+  enabled: boolean;
   sortOrder: number;
   usePlaceholders: boolean;
   createdAt: string;
@@ -90,353 +111,105 @@ export interface BotStatusMessage {
 
 export interface GlobalAdminUser {
   discordId: string;
-  source: "env" | "database";
-  createdAt: string | null;
+  source?: "environment" | "database";
+  createdAt?: string;
 }
 
-export interface AdminBotGuild {
-  guildId: string;
-  guildName: string;
-  iconUrl: string | null;
-  configuredAlertChannelId: string | null;
+export interface AdminBotGuild extends DiscordGuild {
   trackedStreamerCount: number;
-  joinedAt: string;
-  lastSeenAt: string;
-  updatedAt: string;
 }
 
-export interface AdminWhitelistedGuild {
-  id: string;
-  guildId: string;
-  guildName: string | null;
-  notes: string | null;
-  addedByUserId: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface GuildWhitelistEnforcementState {
-  enabled: boolean;
-  updatedAt: string | null;
-  reconciliation?: {
-    checked: number;
-    left: number;
-  };
-}
-
-export interface AdminGlobalConfigResponse {
-  config: GlobalBotConfig;
-  availableActivityTypes: BotActivityType[];
-  availablePlaceholders: string[];
-}
-
-export interface AdminStatusMessagesResponse {
-  items: BotStatusMessage[];
-  total: number;
-  availableActivityTypes: BotActivityType[];
-  availablePlaceholders: string[];
+export interface ApiErrorBody {
+  error?: { code?: string; message?: string; details?: unknown; requestId?: string };
 }
 
 export class ApiHttpError extends Error {
   public constructor(
     public readonly status: number,
-    message: string
+    public readonly code: string,
+    message: string,
+    public readonly details?: unknown,
+    public readonly requestId?: string
   ) {
     super(message);
+    this.name = "ApiHttpError";
   }
 }
 
-const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || "http://localhost:4000";
+const API_BASE_URL = "/api/v1";
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const url = `${API_BASE_URL}${path}`;
-
-  const headers = new Headers(init?.headers ?? undefined);
-  if (init?.body !== undefined && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-
-  const response = await fetch(url, {
-    ...init,
-    credentials: "include",
-    headers
-  });
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  if (init?.body !== undefined && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, credentials: "include", headers });
+  if (response.status === 204) return undefined as T;
 
   const text = await response.text();
-  const data = text ? JSON.parse(text) : {};
-
-  if (!response.ok) {
-    const message =
-      typeof data?.message === "string" ? data.message : `Request failed (${response.status})`;
-    throw new ApiHttpError(response.status, message);
+  let data: unknown = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = {};
   }
-
+  if (!response.ok) {
+    const normalized = data as ApiErrorBody;
+    throw new ApiHttpError(
+      response.status,
+      normalized.error?.code ?? "HTTP_ERROR",
+      normalized.error?.message ?? `Request failed (${response.status})`,
+      normalized.error?.details,
+      normalized.error?.requestId
+    );
+  }
   return data as T;
 }
 
-export function getDiscordLoginUrl(): string {
-  return `${API_BASE_URL}/auth/discord/login`;
+export function getDiscordLoginUrl(): string { return `${API_BASE_URL}/auth/discord/login`; }
+export function getCurrentUser(): Promise<AuthUser> { return apiFetch<AuthUser>("/auth/me"); }
+export async function logout(): Promise<void> { await apiFetch("/auth/logout", { method: "POST" }); }
+export async function getInviteLink(): Promise<string> { return (await apiFetch<{ url: string }>("/bot/invite-url")).url; }
+export async function getDashboardGuilds(): Promise<DashboardGuild[]> { return (await apiFetch<Collection<DashboardGuild>>("/guilds")).items; }
+export function getGuildConfig(guildId: string): Promise<GuildConfig> { return apiFetch(`/guilds/${guildId}`); }
+export function getGuildChannels(guildId: string): Promise<Collection<GuildChannel>> { return apiFetch(`/guilds/${guildId}/channels`); }
+export function updateGuildConfig(guildId: string, alertChannelId: string | null): Promise<GuildConfig> {
+  return apiFetch(`/guilds/${guildId}`, { method: "PATCH", body: JSON.stringify({ alertChannelId }) });
+}
+export async function getGuildStreamers(guildId: string): Promise<Streamer[]> { return (await apiFetch<Collection<Streamer>>(`/guilds/${guildId}/streamers`)).items; }
+export function addStreamer(guildId: string, username: string): Promise<Streamer> {
+  return apiFetch(`/guilds/${guildId}/streamers`, { method: "POST", body: JSON.stringify({ username }) });
+}
+export function updateStreamerState(guildId: string, streamerId: string, enabled: boolean): Promise<Streamer> {
+  return apiFetch(`/guilds/${guildId}/streamers/${streamerId}`, { method: "PATCH", body: JSON.stringify({ enabled }) });
+}
+export async function deleteStreamer(guildId: string, streamerId: string): Promise<void> { await apiFetch(`/guilds/${guildId}/streamers/${streamerId}`, { method: "DELETE" }); }
+export function getGuildNotifications(guildId: string, cursor?: string, limit = 20): Promise<NotificationPage> {
+  const query = new URLSearchParams({ limit: limit.toString() });
+  if (cursor) query.set("cursor", cursor);
+  return apiFetch(`/guilds/${guildId}/notifications?${query.toString()}`);
 }
 
-export async function getCurrentUser(): Promise<AuthUser> {
-  const response = await apiFetch<{ authenticated: boolean; user: AuthUser }>("/auth/me");
-  return response.user;
+export function getAdminSettings(): Promise<BotSettings> { return apiFetch("/admin/settings"); }
+export function updateAdminSettings(input: Partial<Omit<BotSettings, "id" | "createdAt" | "updatedAt">>): Promise<BotSettings> {
+  return apiFetch("/admin/settings", { method: "PATCH", body: JSON.stringify(input) });
+}
+export async function getAdminPresenceMessages(): Promise<BotStatusMessage[]> { return (await apiFetch<Collection<BotStatusMessage>>("/admin/presence-messages")).items; }
+export function createAdminStatusMessage(input: Omit<BotStatusMessage, "id" | "sortOrder" | "createdAt" | "updatedAt">): Promise<BotStatusMessage> {
+  return apiFetch("/admin/presence-messages", { method: "POST", body: JSON.stringify(input) });
+}
+export function updateAdminStatusMessage(id: string, input: Partial<Omit<BotStatusMessage, "id" | "sortOrder" | "createdAt" | "updatedAt">>): Promise<BotStatusMessage> {
+  return apiFetch(`/admin/presence-messages/${id}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+export async function reorderAdminStatusMessages(ids: string[]): Promise<void> { await apiFetch("/admin/presence-messages/order", { method: "PATCH", body: JSON.stringify({ ids }) }); }
+export async function deleteAdminStatusMessage(id: string): Promise<void> { await apiFetch(`/admin/presence-messages/${id}`, { method: "DELETE" }); }
+export async function getAdminGlobalAdmins(): Promise<GlobalAdminUser[]> { return (await apiFetch<Collection<GlobalAdminUser>>("/admin/admins")).items; }
+export function addAdminGlobalAdmin(discordId: string): Promise<GlobalAdminUser> { return apiFetch("/admin/admins", { method: "POST", body: JSON.stringify({ discordId }) }); }
+export async function removeAdminGlobalAdmin(discordId: string): Promise<void> { await apiFetch(`/admin/admins/${discordId}`, { method: "DELETE" }); }
+export async function getAdminBotGuilds(): Promise<AdminBotGuild[]> { return (await apiFetch<Collection<AdminBotGuild>>("/admin/guilds")).items; }
+export async function syncAdminBotGuilds(): Promise<AdminBotGuild[]> { return (await apiFetch<Collection<AdminBotGuild>>("/admin/guilds/sync", { method: "POST" })).items; }
+export async function leaveAdminBotGuild(guildId: string): Promise<void> { await apiFetch(`/admin/guilds/${guildId}/leave`, { method: "POST" }); }
+export function updateAdminGuildAccess(guildId: string, isAllowed: boolean, notes?: string | null): Promise<DiscordGuild> {
+  return apiFetch(`/admin/guilds/${guildId}/access`, { method: "PATCH", body: JSON.stringify({ isAllowed, notes }) });
 }
 
-export async function logout(): Promise<void> {
-  await apiFetch<{ success: true }>("/auth/logout", {
-    method: "POST"
-  });
-}
-
-export async function getInviteLink(): Promise<string> {
-  const response = await apiFetch<{ inviteUrl: string }>("/bot/invite-link");
-  return response.inviteUrl;
-}
-
-export async function getDashboardGuilds(): Promise<DashboardGuild[]> {
-  const response = await apiFetch<{ items: DashboardGuild[]; total: number }>("/dashboard/guilds");
-  return response.items;
-}
-
-export async function getGuildConfig(guildId: string): Promise<GuildConfig> {
-  const response = await apiFetch<{ config: GuildConfig }>(`/guilds/${guildId}/config`);
-  return response.config;
-}
-
-export async function getGuildChannels(guildId: string): Promise<GuildChannelsResponse> {
-  return apiFetch<GuildChannelsResponse>(`/guilds/${guildId}/channels`);
-}
-
-export async function updateGuildConfig(
-  guildId: string,
-  alertChannelId: string | null
-): Promise<GuildConfig> {
-  const response = await apiFetch<{ config: GuildConfig }>(`/guilds/${guildId}/config`, {
-    method: "PUT",
-    body: JSON.stringify({ alertChannelId })
-  });
-
-  return response.config;
-}
-
-export async function getGuildStreamers(guildId: string): Promise<Streamer[]> {
-  const response = await apiFetch<{ items: Streamer[]; total: number }>(`/guilds/${guildId}/streamers`);
-  return response.items;
-}
-
-export async function addStreamer(guildId: string, streamerUsername: string): Promise<Streamer> {
-  const response = await apiFetch<{ streamer: Streamer }>(`/guilds/${guildId}/streamers`, {
-    method: "POST",
-    body: JSON.stringify({ streamerUsername })
-  });
-
-  return response.streamer;
-}
-
-export async function updateStreamerState(
-  guildId: string,
-  streamerId: string,
-  isActive: boolean
-): Promise<Streamer> {
-  const response = await apiFetch<{ streamer: Streamer }>(
-    `/guilds/${guildId}/streamers/${streamerId}`,
-    {
-      method: "PATCH",
-      body: JSON.stringify({ isActive })
-    }
-  );
-
-  return response.streamer;
-}
-
-export async function deleteStreamer(guildId: string, streamerId: string): Promise<void> {
-  await apiFetch<void>(`/guilds/${guildId}/streamers/${streamerId}`, {
-    method: "DELETE"
-  });
-}
-
-export async function getGuildNotifications(
-  guildId: string,
-  page: number,
-  pageSize: number
-): Promise<PaginatedNotifications> {
-  return apiFetch<PaginatedNotifications>(
-    `/guilds/${guildId}/notifications?page=${page}&pageSize=${pageSize}`
-  );
-}
-
-export async function getAdminGlobalConfig(): Promise<AdminGlobalConfigResponse> {
-  return apiFetch<AdminGlobalConfigResponse>("/admin/global-config");
-}
-
-export async function getAdminStatusMessages(): Promise<AdminStatusMessagesResponse> {
-  return apiFetch<AdminStatusMessagesResponse>("/admin/status-messages");
-}
-
-export async function updateAdminGlobalConfig(input: {
-  rotationEnabled: boolean;
-  rotationIntervalSeconds: number;
-  defaultStatusEnabled: boolean;
-  defaultStatusText: string | null;
-  defaultActivityType: BotActivityType | null;
-}): Promise<GlobalBotConfig> {
-  const response = await apiFetch<{ config: GlobalBotConfig }>("/admin/global-config", {
-    method: "PUT",
-    body: JSON.stringify(input)
-  });
-
-  return response.config;
-}
-
-export async function createAdminStatusMessage(input: {
-  text: string;
-  activityType: BotActivityType;
-  isEnabled: boolean;
-  usePlaceholders: boolean;
-}): Promise<BotStatusMessage> {
-  const response = await apiFetch<{ item: BotStatusMessage }>("/admin/status-messages", {
-    method: "POST",
-    body: JSON.stringify(input)
-  });
-
-  return response.item;
-}
-
-export async function updateAdminStatusMessage(
-  id: string,
-  input: {
-    text: string;
-    activityType: BotActivityType;
-    isEnabled: boolean;
-    usePlaceholders: boolean;
-  }
-): Promise<BotStatusMessage> {
-  const response = await apiFetch<{ item: BotStatusMessage }>(`/admin/status-messages/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(input)
-  });
-
-  return response.item;
-}
-
-export async function toggleAdminStatusMessage(
-  id: string,
-  isEnabled: boolean
-): Promise<BotStatusMessage> {
-  const response = await apiFetch<{ item: BotStatusMessage }>(`/admin/status-messages/${id}/toggle`, {
-    method: "PATCH",
-    body: JSON.stringify({ isEnabled })
-  });
-
-  return response.item;
-}
-
-export async function reorderAdminStatusMessages(idsInOrder: string[]): Promise<BotStatusMessage[]> {
-  const response = await apiFetch<{ items: BotStatusMessage[]; total: number }>(
-    "/admin/status-messages/reorder",
-    {
-      method: "PATCH",
-      body: JSON.stringify({ idsInOrder })
-    }
-  );
-
-  return response.items;
-}
-
-export async function deleteAdminStatusMessage(id: string): Promise<void> {
-  await apiFetch<void>(`/admin/status-messages/${id}`, {
-    method: "DELETE"
-  });
-}
-
-export async function getAdminGlobalAdmins(): Promise<GlobalAdminUser[]> {
-  const response = await apiFetch<{ items: GlobalAdminUser[]; total: number }>("/admin/global-admins");
-  return response.items;
-}
-
-export async function addAdminGlobalAdmin(discordId: string): Promise<GlobalAdminUser> {
-  const response = await apiFetch<{ item: GlobalAdminUser }>("/admin/global-admins", {
-    method: "POST",
-    body: JSON.stringify({ discordId })
-  });
-
-  return response.item;
-}
-
-export async function removeAdminGlobalAdmin(discordId: string): Promise<void> {
-  await apiFetch<void>(`/admin/global-admins/${discordId}`, {
-    method: "DELETE"
-  });
-}
-
-export async function getAdminBotGuilds(): Promise<AdminBotGuild[]> {
-  const response = await apiFetch<{ items: AdminBotGuild[]; total: number }>("/admin/bot-guilds");
-  return response.items;
-}
-
-export async function syncAdminBotGuilds(): Promise<AdminBotGuild[]> {
-  const response = await apiFetch<{ items: AdminBotGuild[]; total: number; syncedAt: string }>(
-    "/admin/bot-guilds/sync",
-    {
-      method: "POST"
-    }
-  );
-
-  return response.items;
-}
-
-export async function leaveAdminBotGuild(guildId: string): Promise<void> {
-  await apiFetch<{ success: boolean; guildId: string }>(`/admin/bot-guilds/${guildId}/leave`, {
-    method: "DELETE"
-  });
-}
-
-export async function getAdminWhitelistEnforcement(): Promise<GuildWhitelistEnforcementState> {
-  return apiFetch<GuildWhitelistEnforcementState>("/admin/settings/whitelist-enforcement");
-}
-
-export async function updateAdminWhitelistEnforcement(
-  enabled: boolean
-): Promise<GuildWhitelistEnforcementState> {
-  return apiFetch<GuildWhitelistEnforcementState>("/admin/settings/whitelist-enforcement", {
-    method: "PUT",
-    body: JSON.stringify({ enabled })
-  });
-}
-
-export async function getAdminWhitelistedGuilds(): Promise<AdminWhitelistedGuild[]> {
-  const response = await apiFetch<{ items: AdminWhitelistedGuild[]; total: number }>(
-    "/admin/whitelist/guilds"
-  );
-  return response.items;
-}
-
-export async function addAdminWhitelistedGuild(input: {
-  guildId: string;
-  guildName?: string;
-  notes?: string;
-}): Promise<AdminWhitelistedGuild> {
-  const response = await apiFetch<{ item: AdminWhitelistedGuild }>("/admin/whitelist/guilds", {
-    method: "POST",
-    body: JSON.stringify(input)
-  });
-
-  return response.item;
-}
-
-export async function removeAdminWhitelistedGuild(
-  guildId: string
-): Promise<{ success: boolean; guildId: string; evicted: boolean }> {
-  return apiFetch<{ success: boolean; guildId: string; evicted: boolean }>(
-    `/admin/whitelist/guilds/${guildId}`,
-    {
-      method: "DELETE"
-    }
-  );
-}
+export const ACTIVITY_TYPES: BotActivityType[] = ["PLAYING", "WATCHING", "LISTENING", "COMPETING", "CUSTOM"];
+export const PRESENCE_PLACEHOLDERS = ["{guilds}", "{streamers}"] as const;

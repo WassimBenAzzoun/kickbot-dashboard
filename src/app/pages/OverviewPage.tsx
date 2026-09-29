@@ -48,8 +48,8 @@ export function OverviewPage() {
 
   const notificationsQuery = useQuery({
     enabled: Boolean(featuredGuild),
-    queryKey: dashboardKeys.guildNotifications(featuredGuild?.id ?? "", 1, 5),
-    queryFn: () => getGuildNotifications(featuredGuild!.id, 1, 5)
+    queryKey: dashboardKeys.guildNotifications(featuredGuild?.id ?? "", undefined, 5),
+    queryFn: () => getGuildNotifications(featuredGuild!.id, undefined, 5)
   });
 
   const filteredGuilds = useMemo(() => {

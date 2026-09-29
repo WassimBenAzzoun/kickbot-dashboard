@@ -13,7 +13,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  refreshSession: () => Promise<void>;
+  refreshSession: () => Promise<boolean>;
   startDiscordLogin: () => void;
   logout: () => Promise<void>;
 }
@@ -30,12 +30,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
     try {
       const sessionUser = await getCurrentUser();
       setUser(sessionUser);
+      return true;
     } catch (error) {
       if (error instanceof ApiHttpError && error.status === 401) {
         setUser(null);
       } else {
         setUser(null);
       }
+      return false;
     } finally {
       setIsLoading(false);
     }

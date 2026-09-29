@@ -22,7 +22,10 @@
     "src/app/**/*.ts",
     "src/app/**/*.tsx",
     "src/styles/**/*.css",
-    "vite.config.ts"
+    "vite.config.ts",
+    "vitest.config.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx"
   ],
   "exclude": ["src/app/components/ui/**/*", "node_modules", "dist"]
 }

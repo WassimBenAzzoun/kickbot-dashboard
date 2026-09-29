@@ -11,7 +11,8 @@ interface NotificationHistoryTableProps {
   notifications: NotificationItem[];
   emptyState?: ReactNode;
   page?: number;
-  totalPages?: number;
+  hasPrevious?: boolean;
+  hasNext?: boolean;
   onPreviousPage?: () => void;
   onNextPage?: () => void;
   variant?: "full" | "compact";
@@ -29,7 +30,8 @@ export function NotificationHistoryTable({
   notifications,
   emptyState,
   page,
-  totalPages,
+  hasPrevious,
+  hasNext,
   onPreviousPage,
   onNextPage,
   variant = "full"
@@ -66,7 +68,7 @@ export function NotificationHistoryTable({
                   <Badge variant={statusVariant(notification.status)}>{notification.status}</Badge>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {notification.messageId ?? "No message ID"}
+                  {notification.discordMessageId ?? "No message ID"}
                 </TableCell>
               </TableRow>
             ))}
@@ -101,7 +103,7 @@ export function NotificationHistoryTable({
                 ) : null}
                 <div>
                   <p className="text-sm font-medium text-foreground">Discord message</p>
-                  <p className="text-sm text-muted-foreground">{notification.messageId ?? "No message ID"}</p>
+                  <p className="text-sm text-muted-foreground">{notification.discordMessageId ?? "No message ID"}</p>
                 </div>
               </div>
             </CardContent>
@@ -109,16 +111,16 @@ export function NotificationHistoryTable({
         ))}
       </div>
 
-      {variant === "full" && typeof page === "number" && typeof totalPages === "number" ? (
+      {variant === "full" && typeof page === "number" ? (
         <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card/90 p-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
+            Page {page}
           </p>
           <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={onPreviousPage} disabled={!onPreviousPage || page <= 1}>
+            <Button variant="outline" onClick={onPreviousPage} disabled={!onPreviousPage || !hasPrevious}>
               Previous
             </Button>
-            <Button variant="outline" onClick={onNextPage} disabled={!onNextPage || page >= totalPages}>
+            <Button variant="outline" onClick={onNextPage} disabled={!onNextPage || !hasNext}>
               Next
             </Button>
           </div>

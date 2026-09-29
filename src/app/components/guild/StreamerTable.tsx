@@ -29,8 +29,8 @@ interface StreamerTableProps {
 function StreamerStatus({ streamer }: { streamer: Streamer }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Badge variant={streamer.isActive ? "success" : "secondary"}>
-        {streamer.isActive ? "Tracking on" : "Tracking off"}
+      <Badge variant={streamer.enabled ? "success" : "secondary"}>
+        {streamer.enabled ? "Tracking on" : "Tracking off"}
       </Badge>
       <Badge variant={streamer.lastKnownLiveState ? "default" : "outline"}>
         {streamer.lastKnownLiveState ? "Live now" : "Offline"}
@@ -47,14 +47,14 @@ function StreamerActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="ghost" aria-label={`Actions for ${streamer.streamerUsername}`}>
+        <Button size="icon" variant="ghost" aria-label={`Actions for ${streamer.username}`}>
           <MoreHorizontal />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuGroup>
           <DropdownMenuItem onClick={() => onToggle(streamer)}>
-            {streamer.isActive ? "Disable tracking" : "Enable tracking"}
+            {streamer.enabled ? "Disable tracking" : "Enable tracking"}
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link to={buildGuildRoute(streamer.guildId, "notifications")}>View notifications</Link>
@@ -102,7 +102,7 @@ export function StreamerTable({
               <TableRow key={streamer.id}>
                 <TableCell>
                   <div className="space-y-1">
-                    <div className="font-medium text-foreground">{streamer.streamerUsername}</div>
+                    <div className="font-medium text-foreground">{streamer.username}</div>
                     <div className="text-sm text-muted-foreground">Kick</div>
                   </div>
                 </TableCell>
@@ -120,12 +120,12 @@ export function StreamerTable({
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <Switch
-                      checked={streamer.isActive}
+                      checked={streamer.enabled}
                       onCheckedChange={() => onToggle(streamer)}
-                      aria-label={`Toggle ${streamer.streamerUsername}`}
+                      aria-label={`Toggle ${streamer.username}`}
                     />
                     <span className="text-sm text-muted-foreground">
-                      {streamer.isActive ? "Enabled" : "Disabled"}
+                      {streamer.enabled ? "Enabled" : "Disabled"}
                     </span>
                   </div>
                 </TableCell>
@@ -144,7 +144,7 @@ export function StreamerTable({
             <CardHeader className="gap-3 pb-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <CardTitle className="text-base">{streamer.streamerUsername}</CardTitle>
+                  <CardTitle className="text-base">{streamer.username}</CardTitle>
                   <CardDescription>Kick streamer tracked for this guild</CardDescription>
                 </div>
                 <StreamerActions streamer={streamer} onToggle={onToggle} onDelete={onDelete} />
@@ -156,13 +156,13 @@ export function StreamerTable({
                 <div>
                   <p className="text-sm font-medium text-foreground">Tracking</p>
                   <p className="text-sm text-muted-foreground">
-                    {streamer.isActive ? "Enabled for alerts" : "Disabled"}
+                    {streamer.enabled ? "Enabled for alerts" : "Disabled"}
                   </p>
                 </div>
                 <Switch
-                  checked={streamer.isActive}
+                  checked={streamer.enabled}
                   onCheckedChange={() => onToggle(streamer)}
-                  aria-label={`Toggle ${streamer.streamerUsername}`}
+                  aria-label={`Toggle ${streamer.username}`}
                 />
               </div>
               <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">

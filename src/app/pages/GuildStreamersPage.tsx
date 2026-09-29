@@ -62,14 +62,14 @@ export function GuildStreamersPage() {
   });
 
   const toggleStreamerMutation = useMutation({
-    mutationFn: (streamer: Streamer) => updateStreamerState(guildId, streamer.id, !streamer.isActive),
+    mutationFn: (streamer: Streamer) => updateStreamerState(guildId, streamer.id, !streamer.enabled),
     onSuccess: async (streamer) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: dashboardKeys.guildStreamers(guildId) }),
         queryClient.invalidateQueries({ queryKey: dashboardKeys.guilds() })
       ]);
       toast.success(
-        `${streamer.streamerUsername} ${streamer.isActive ? "enabled" : "disabled"} successfully.`
+        `${streamer.username} ${streamer.enabled ? "enabled" : "disabled"} successfully.`
       );
     },
     onError: (error) => {
@@ -98,21 +98,21 @@ export function GuildStreamersPage() {
     return [...(streamersQuery.data ?? [])]
       .filter((streamer) => {
         if (filter === "enabled") {
-          return streamer.isActive;
+          return streamer.enabled;
         }
 
         if (filter === "disabled") {
-          return !streamer.isActive;
+          return !streamer.enabled;
         }
 
         return true;
       })
       .filter((streamer) =>
         normalizedSearch
-          ? streamer.streamerUsername.toLowerCase().includes(normalizedSearch)
+          ? streamer.username.toLowerCase().includes(normalizedSearch)
           : true
       )
-      .sort((left, right) => left.streamerUsername.localeCompare(right.streamerUsername));
+      .sort((left, right) => left.username.localeCompare(right.username));
   }, [deferredSearch, filter, streamersQuery.data]);
 
   if (guildLoading || streamersQuery.isLoading) {
@@ -203,7 +203,7 @@ export function GuildStreamersPage() {
             <AlertDialogTitle>Remove streamer from this guild?</AlertDialogTitle>
             <AlertDialogDescription>
               {streamerToDelete
-                ? `This stops tracking ${streamerToDelete.streamerUsername} for ${selectedGuild.name}.`
+                ? `This stops tracking ${streamerToDelete.username} for ${selectedGuild.name}.`
                 : "Remove this streamer from tracking."}
             </AlertDialogDescription>
           </AlertDialogHeader>

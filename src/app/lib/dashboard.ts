@@ -10,18 +10,8 @@ export const dashboardKeys = {
   guildConfig: (guildId: string) => ["guild", guildId, "config"] as const,
   guildChannels: (guildId: string) => ["guild", guildId, "channels"] as const,
   guildStreamers: (guildId: string) => ["guild", guildId, "streamers"] as const,
-  guildNotifications: (guildId: string, page: number, pageSize: number) =>
-    ["guild", guildId, "notifications", page, pageSize] as const
-};
-
-type GuildLike = Partial<DashboardGuild> & {
-  id?: string | null;
-  name?: string | null;
-  image?: string | null;
-  avatar?: string | null;
-  icon?: string | null;
-  iconHash?: string | null;
-  alertChannelId?: string | null;
+  guildNotifications: (guildId: string, cursor: string | undefined, limit: number) =>
+    ["guild", guildId, "notifications", cursor ?? "first", limit] as const
 };
 
 export interface NormalizedGuild {
@@ -42,31 +32,6 @@ export interface DashboardMetrics {
   connectedGuilds: number;
 }
 
-function normalizeImageUrl(value?: string | null): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  if (/^https?:\/\//i.test(trimmed)) {
-    return trimmed;
-  }
-
-  if (trimmed.startsWith("//")) {
-    return `https:${trimmed}`;
-  }
-
-  if (trimmed.startsWith("cdn.discordapp.com/")) {
-    return `https://${trimmed}`;
-  }
-
-  return null;
-}
-
 function buildDiscordGuildIconUrl(guildId?: string | null, iconHash?: string | null): string | null {
   if (!guildId || !iconHash) {
     return null;
@@ -76,26 +41,18 @@ function buildDiscordGuildIconUrl(guildId?: string | null, iconHash?: string | n
   return `https://cdn.discordapp.com/icons/${guildId}/${iconHash}.${extension}?size=128`;
 }
 
-export function normalizeGuild(rawGuild: GuildLike): NormalizedGuild {
-  const id = rawGuild.guildId ?? rawGuild.id ?? "";
-  const name = rawGuild.guildName ?? rawGuild.name ?? "Unknown guild";
-
-  const iconUrl =
-    normalizeImageUrl(rawGuild.iconUrl) ??
-    normalizeImageUrl(rawGuild.image) ??
-    normalizeImageUrl(rawGuild.avatar) ??
-    buildDiscordGuildIconUrl(id, rawGuild.iconHash ?? rawGuild.icon) ??
-    null;
-
+export function normalizeGuild(rawGuild: DashboardGuild): NormalizedGuild {
+  const id = rawGuild.id;
+  const name = rawGuild.name;
   return {
     id,
     name,
     initials: getInitials(name),
-    iconUrl,
-    botInGuild: rawGuild.botInGuild ?? null,
-    alertChannelId: rawGuild.configuredAlertChannelId ?? rawGuild.alertChannelId ?? null,
-    trackedStreamerCount: rawGuild.trackedStreamerCount ?? 0,
-    userCanManage: rawGuild.userCanManage ?? true
+    iconUrl: buildDiscordGuildIconUrl(id, rawGuild.iconHash),
+    botInGuild: rawGuild.membershipState === "CONNECTED",
+    alertChannelId: rawGuild.alertChannelId,
+    trackedStreamerCount: rawGuild.trackedStreamerCount,
+    userCanManage: true
   };
 }
 

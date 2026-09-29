@@ -57,9 +57,13 @@ export function GuildDetailPage() {
     queryKey: dashboardKeys.guildChannels(guildId),
     queryFn: async () => {
       try {
-        return await getGuildChannels(guildId);
+        return { ...(await getGuildChannels(guildId)), source: "bot_api" as const };
       } catch {
-        return { items: [], total: 0, source: "unavailable" as const };
+        return {
+          items: [],
+          page: { nextCursor: null, hasMore: false },
+          source: "unavailable" as const
+        };
       }
     }
   });
@@ -72,14 +76,14 @@ export function GuildDetailPage() {
 
   const notificationsQuery = useQuery({
     enabled: Boolean(guildId),
-    queryKey: dashboardKeys.guildNotifications(guildId, 1, 6),
-    queryFn: () => getGuildNotifications(guildId, 1, 6)
+    queryKey: dashboardKeys.guildNotifications(guildId, undefined, 6),
+    queryFn: () => getGuildNotifications(guildId, undefined, 6)
   });
 
   const streamers = useMemo(
     () =>
       [...(streamersQuery.data ?? [])].sort((left, right) =>
-        left.streamerUsername.localeCompare(right.streamerUsername)
+        left.username.localeCompare(right.username)
       ),
     [streamersQuery.data]
   );
@@ -113,14 +117,14 @@ export function GuildDetailPage() {
   });
 
   const toggleStreamerMutation = useMutation({
-    mutationFn: (streamer: Streamer) => updateStreamerState(guildId, streamer.id, !streamer.isActive),
+    mutationFn: (streamer: Streamer) => updateStreamerState(guildId, streamer.id, !streamer.enabled),
     onSuccess: async (streamer) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: dashboardKeys.guildStreamers(guildId) }),
         queryClient.invalidateQueries({ queryKey: dashboardKeys.guilds() })
       ]);
       toast.success(
-        `${streamer.streamerUsername} ${streamer.isActive ? "enabled" : "disabled"} successfully.`
+        `${streamer.username} ${streamer.enabled ? "enabled" : "disabled"} successfully.`
       );
     },
     onError: (error) => {
@@ -244,7 +248,7 @@ export function GuildDetailPage() {
               <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
                 <p className="text-sm font-medium text-foreground">Notification volume</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {notificationsQuery.data?.total ?? 0} logged deliveries
+                  {notificationsQuery.data?.items.length ?? 0} recent deliveries
                 </p>
               </div>
               <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3">
@@ -368,7 +372,7 @@ export function GuildDetailPage() {
             <AlertDialogTitle>Remove streamer from this guild?</AlertDialogTitle>
             <AlertDialogDescription>
               {streamerToDelete
-                ? `This stops tracking ${streamerToDelete.streamerUsername} for ${selectedGuild.name}. Existing notification history stays available.`
+                ? `This stops tracking ${streamerToDelete.username} for ${selectedGuild.name}. Existing notification history stays available.`
                 : "Remove this streamer from tracking."}
             </AlertDialogDescription>
           </AlertDialogHeader>

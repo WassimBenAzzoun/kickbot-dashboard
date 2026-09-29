@@ -3,16 +3,17 @@ import { Activity, GripVertical, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   ApiHttpError,
+  ACTIVITY_TYPES,
   BotActivityType,
   BotStatusMessage,
+  PRESENCE_PLACEHOLDERS,
   createAdminStatusMessage,
   deleteAdminStatusMessage,
-  getAdminGlobalConfig,
-  getAdminStatusMessages,
+  getAdminSettings,
+  getAdminPresenceMessages,
   GlobalBotConfig,
   reorderAdminStatusMessages,
-  toggleAdminStatusMessage,
-  updateAdminGlobalConfig,
+  updateAdminSettings,
   updateAdminStatusMessage
 } from "@/app/lib/api";
 import { formatDateTime } from "@/app/lib/format";
@@ -90,19 +91,19 @@ export function AdminPresencePage() {
   async function load(): Promise<void> {
     try {
       const [globalConfigResponse, statusResponse] = await Promise.all([
-        getAdminGlobalConfig(),
-        getAdminStatusMessages()
+        getAdminSettings(),
+        getAdminPresenceMessages()
       ]);
 
-      setConfig(globalConfigResponse.config);
-      setActivityTypes(globalConfigResponse.availableActivityTypes);
-      setPlaceholders(globalConfigResponse.availablePlaceholders);
-      setRotationEnabled(globalConfigResponse.config.rotationEnabled);
-      setRotationIntervalSeconds(String(globalConfigResponse.config.rotationIntervalSeconds));
-      setDefaultStatusEnabled(globalConfigResponse.config.defaultStatusEnabled);
-      setDefaultStatusText(globalConfigResponse.config.defaultStatusText ?? "");
-      setDefaultActivityType(globalConfigResponse.config.defaultActivityType ?? "");
-      setStatusMessages(statusResponse.items);
+      setConfig(globalConfigResponse);
+      setActivityTypes(ACTIVITY_TYPES);
+      setPlaceholders([...PRESENCE_PLACEHOLDERS]);
+      setRotationEnabled(globalConfigResponse.rotationEnabled);
+      setRotationIntervalSeconds(String(globalConfigResponse.rotationIntervalSeconds));
+      setDefaultStatusEnabled(globalConfigResponse.defaultStatusEnabled);
+      setDefaultStatusText(globalConfigResponse.defaultStatusText ?? "");
+      setDefaultActivityType(globalConfigResponse.defaultActivityType ?? "");
+      setStatusMessages(statusResponse);
     } catch (error) {
       if (error instanceof ApiHttpError && error.status === 403) {
         toast.error("Global admin access is required.");
@@ -122,8 +123,8 @@ export function AdminPresencePage() {
     event.preventDefault();
 
     const interval = Number.parseInt(rotationIntervalSeconds, 10);
-    if (Number.isNaN(interval) || interval < 5 || interval > 3600) {
-      toast.error("Rotation interval must be between 5 and 3600 seconds.");
+    if (Number.isNaN(interval) || interval < 10 || interval > 3600) {
+      toast.error("Rotation interval must be between 10 and 3600 seconds.");
       return;
     }
 
@@ -134,7 +135,7 @@ export function AdminPresencePage() {
     setIsSavingConfig(true);
 
     try {
-      const updated = await updateAdminGlobalConfig({
+      const updated = await updateAdminSettings({
         rotationEnabled,
         rotationIntervalSeconds: interval,
         defaultStatusEnabled,
@@ -166,15 +167,20 @@ export function AdminPresencePage() {
     setStatusForm({
       text: message.text,
       activityType: message.activityType,
-      isEnabled: message.isEnabled,
+      isEnabled: message.enabled,
       usePlaceholders: message.usePlaceholders
     });
   }
 
   async function reorderStatuses(idsInOrder: string[]): Promise<void> {
     try {
-      const updated = await reorderAdminStatusMessages(idsInOrder);
-      setStatusMessages(updated);
+      await reorderAdminStatusMessages(idsInOrder);
+      setStatusMessages((previous) =>
+        idsInOrder.map((id, sortOrder) => ({
+          ...previous.find((message) => message.id === id)!,
+          sortOrder
+        }))
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to reorder statuses.");
     } finally {
@@ -204,7 +210,7 @@ export function AdminPresencePage() {
         const updated = await updateAdminStatusMessage(editingStatusId, {
           text,
           activityType: statusForm.activityType,
-          isEnabled: statusForm.isEnabled,
+          enabled: statusForm.isEnabled,
           usePlaceholders: statusForm.usePlaceholders
         });
         setStatusMessages((previous) =>
@@ -215,7 +221,7 @@ export function AdminPresencePage() {
         const created = await createAdminStatusMessage({
           text,
           activityType: statusForm.activityType,
-          isEnabled: statusForm.isEnabled,
+          enabled: statusForm.isEnabled,
           usePlaceholders: statusForm.usePlaceholders
         });
         setStatusMessages((previous) => [...previous, created]);
@@ -232,11 +238,11 @@ export function AdminPresencePage() {
 
   async function handleToggleStatus(message: BotStatusMessage): Promise<void> {
     try {
-      const updated = await toggleAdminStatusMessage(message.id, !message.isEnabled);
+      const updated = await updateAdminStatusMessage(message.id, { enabled: !message.enabled });
       setStatusMessages((previous) =>
         previous.map((item) => (item.id === updated.id ? updated : item))
       );
-      toast.success(`Status ${updated.isEnabled ? "enabled" : "disabled"}.`);
+      toast.success(`Status ${updated.enabled ? "enabled" : "disabled"}.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to toggle status.");
     }
@@ -627,8 +633,8 @@ export function AdminPresencePage() {
                         <TableCell className="font-medium">{message.text}</TableCell>
                         <TableCell>{message.activityType}</TableCell>
                         <TableCell>
-                          <Badge variant={message.isEnabled ? "success" : "secondary"}>
-                            {message.isEnabled ? "Enabled" : "Disabled"}
+                          <Badge variant={message.enabled ? "success" : "secondary"}>
+                            {message.enabled ? "Enabled" : "Disabled"}
                           </Badge>
                         </TableCell>
                         <TableCell>{message.usePlaceholders ? "Yes" : "No"}</TableCell>
@@ -654,7 +660,7 @@ export function AdminPresencePage() {
                               Edit
                             </Button>
                             <Button variant="outline" size="sm" onClick={() => void handleToggleStatus(message)}>
-                              {message.isEnabled ? "Disable" : "Enable"}
+                              {message.enabled ? "Disable" : "Enable"}
                             </Button>
                             <Button variant="destructive" size="sm" onClick={() => void handleDeleteStatus(message)}>
                               <Trash2 data-icon="inline-start" />

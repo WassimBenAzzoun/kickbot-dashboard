@@ -68,7 +68,7 @@ export function AdminAccessPage() {
   }
 
   async function handleRemoveGlobalAdmin(admin: GlobalAdminUser): Promise<void> {
-    if (admin.source === "env") {
+    if (admin.source === "environment") {
       toast.error("This global admin is managed by env and cannot be removed here.");
       return;
     }
@@ -153,8 +153,8 @@ export function AdminAccessPage() {
                     <div className="space-y-1">
                       <p className="font-medium text-foreground">{admin.discordId}</p>
                       <div className="flex flex-wrap gap-2">
-                        <Badge variant={admin.source === "env" ? "outline" : "secondary"}>
-                          {admin.source === "env" ? "Env-managed" : "Database"}
+                        <Badge variant={admin.source === "environment" ? "outline" : "secondary"}>
+                          {admin.source === "environment" ? "Env-managed" : "Database"}
                         </Badge>
                         {admin.discordId === user?.id ? <Badge variant="success">Current user</Badge> : null}
                       </div>
@@ -165,7 +165,7 @@ export function AdminAccessPage() {
 
                     {admin.discordId === user?.id ? (
                       <Badge variant="outline">Protected</Badge>
-                    ) : admin.source === "env" ? (
+                    ) : admin.source === "environment" ? (
                       <Badge variant="outline">Managed in env</Badge>
                     ) : (
                       <Button

@@ -72,7 +72,7 @@ export function GuildSettingsCard({
               <SelectGroup>
                 {availableChannels.map((channel) => (
                   <SelectItem key={channel.id} value={channel.id}>
-                    #{channel.name} {channel.type === "GUILD_ANNOUNCEMENT" ? "(Announcement)" : "(Text)"}
+                    #{channel.name} {channel.type === 5 ? "(Announcement)" : "(Text)"}
                   </SelectItem>
                 ))}
               </SelectGroup>

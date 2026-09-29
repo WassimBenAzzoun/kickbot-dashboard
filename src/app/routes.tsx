@@ -58,7 +58,7 @@ function ProtectedRoute({ children }: { children: ReactElement }) {
   return children;
 }
 
-function GlobalAdminRoute({ children }: { children: ReactElement }) {
+export function GlobalAdminRoute({ children }: { children: ReactElement }) {
   const { isLoading, isAuthenticated, user } = useAuth();
 
   if (isLoading) {

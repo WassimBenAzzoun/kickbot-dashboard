@@ -1,140 +1,56 @@
-# KickBot Frontend
+# KickBot Dashboard
 
-Frontend dashboard for managing the KickBot Discord notification system.
+Static React/Vite dashboard for the KickBot NestJS backend. The repositories and deployments remain separate: Vercel serves only this SPA, while Heroku runs the HTTP API and Discord bot.
 
-This repo is the user-facing dashboard that connects to the backend API for:
-- Discord OAuth login
-- guild switching and settings
-- streamer management
-- notification history
-- onboarding and invite flow
-- global admin tooling
+## Local development
 
-## Stack
-
-- React 18
-- TypeScript
-- Vite
-- React Router
-- TanStack Query
-- Tailwind CSS v4
-- shadcn/ui-style component architecture
-- Radix UI primitives
-
-## Related Repo
-
-The backend and Discord bot live separately in:
-- `KickBot`
-
-This frontend expects the backend API and auth flow to be available.
-
-## Environment
-
-Copy `.env.example` to `.env` and set:
+Requirements: Node.js 24 and the backend listening on port `4000`.
 
 ```bash
-VITE_API_BASE_URL=http://localhost:4000
-```
-
-## Local Development
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Start the app:
-
-```bash
+npm ci
 npm run dev
 ```
 
-By default the Vite dev server runs locally and talks to the backend API defined in `VITE_API_BASE_URL`.
+Open `http://localhost:3000`. Browser calls always use `/api/v1`; Vite proxies `/api` to `BACKEND_PROXY_TARGET` (default `http://localhost:4000`). This mirrors production and requires no browser-visible API environment variable.
 
-## VPS Deployment
-
-This repo now includes frontend deployment scripts:
-
-- `scripts/deploy.sh`
-- `scripts/update.sh`
-
-Typical first deployment on the VPS:
-
-```bash
-cp .env.example .env
-chmod +x scripts/*.sh
-chmod +x scripts/lib/*.sh
-./scripts/deploy.sh
-```
-
-Typical update on the VPS:
-
-```bash
-./scripts/update.sh --force
-```
-
-Optional environment variables on the VPS:
-
-- `FRONTEND_DEPLOY_TARGET_DIR`
-  - if set, built files from `dist/` are synced there with `rsync`
-- `FRONTEND_POST_DEPLOY_CMD`
-  - if set, this command is executed after the build/sync step
-
-This is useful if you want to copy the Vite build into a Caddy-served directory or restart a frontend service after deployment.
-
-## Build
-
-Production build:
-
-```bash
-npm run build
-```
-
-Preview the production build locally:
-
-```bash
-npm run preview
-```
-
-Type-check the app:
+Useful checks:
 
 ```bash
 npm run typecheck
+npm test
+npm run build
+npm audit --omit=dev
 ```
 
-## Backend Integration
+## Vercel deployment
 
-The dashboard currently integrates with:
+1. Create a Vercel project from this repository and keep the framework preset as Vite.
+2. The committed `/api` rewrite targets the `discord-notifications` Heroku production app.
+3. Keep the production branch as `main`. The committed Git configuration disables automatic deployments for every other branch, including previews.
+4. No Vercel environment variable is needed for the API URL. The ordered CDN rewrites proxy `/api/*` to Heroku first and send all other deep links to `index.html`.
 
-- `GET /auth/discord/login`
-- `GET /auth/me`
-- `POST /auth/logout`
-- `GET /dashboard/guilds`
-- `GET /guilds/:guildId/config`
-- `PUT /guilds/:guildId/config`
-- `GET /guilds/:guildId/channels`
-- `GET /guilds/:guildId/streamers`
-- `POST /guilds/:guildId/streamers`
-- `PATCH /guilds/:guildId/streamers/:streamerId`
-- `DELETE /guilds/:guildId/streamers/:streamerId`
-- `GET /guilds/:guildId/notifications`
-- `GET /bot/invite-link`
-- global admin endpoints exposed by the backend
+Vercel builds `dist/` with Node 24. There are no SSR routes, Serverless Functions, or middleware.
 
-## Product Areas
+## Backend and Discord production settings
 
-- overview dashboard
-- guild management
-- tracked streamers
-- notification history
-- setup / onboarding
-- profile and account
-- global admin screens
+After the final Vercel hostname is known, configure the Heroku app:
 
-## Notes
+```text
+FRONTEND_URL=https://<VERCEL_PROJECT>.vercel.app
+CORS_ORIGINS=https://<VERCEL_PROJECT>.vercel.app
+DISCORD_REDIRECT_URI=https://<VERCEL_PROJECT>.vercel.app/api/v1/auth/discord/callback
+COOKIE_SECURE=true
+```
 
-- Requests are sent with `credentials: include`, so backend CORS and cookie settings must allow the frontend origin.
-- The frontend expects the backend OAuth callback flow to redirect users back to `FRONTEND_URL/auth/callback`.
-- This repo is intentionally separate from the bot/backend so frontend and backend can be pushed and deployed independently.
-- The GitHub Action deploy workflow calls `./scripts/update.sh --force` on the VPS.
+Leave `COOKIE_DOMAIN` unset so the proxied session cookie belongs to the Vercel origin. Register these Discord OAuth redirects:
+
+```text
+http://localhost:3000/api/v1/auth/discord/callback
+https://<VERCEL_PROJECT>.vercel.app/api/v1/auth/discord/callback
+```
+
+The backend remains authoritative for authentication, guild permissions, and global-admin access. Hiding admin routes in this SPA is only a user-interface convenience.
+
+## API contract
+
+The canonical prefix is `/api/v1`. The client consumes direct entity responses, `{ items, page: { nextCursor, hasMore } }` collections, normalized error objects, and cursor-based notification history. The live backend OpenAPI contract is available at `/api/docs-json` through the same proxy.

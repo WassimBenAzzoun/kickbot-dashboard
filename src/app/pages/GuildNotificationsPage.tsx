@@ -12,14 +12,16 @@ import { Button } from "@/app/components/ui/button";
 
 export function GuildNotificationsPage() {
   const { guildId = "" } = useParams();
-  const [page, setPage] = useState(1);
+  const [cursorHistory, setCursorHistory] = useState<Array<string | undefined>>([undefined]);
+  const [pageIndex, setPageIndex] = useState(0);
   const pageSize = 12;
+  const cursor = cursorHistory[pageIndex];
   const { selectedGuild, isLoading: guildLoading } = useSelectedGuild(guildId);
 
   const notificationsQuery = useQuery({
     enabled: Boolean(guildId),
-    queryKey: dashboardKeys.guildNotifications(guildId, page, pageSize),
-    queryFn: () => getGuildNotifications(guildId, page, pageSize),
+    queryKey: dashboardKeys.guildNotifications(guildId, cursor, pageSize),
+    queryFn: () => getGuildNotifications(guildId, cursor, pageSize),
     placeholderData: keepPreviousData
   });
 
@@ -57,14 +59,20 @@ export function GuildNotificationsPage() {
 
       <NotificationHistoryTable
         notifications={notificationsQuery.data?.items ?? []}
-        page={page}
-        totalPages={notificationsQuery.data?.totalPages ?? 1}
-        onPreviousPage={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
-        onNextPage={() =>
-          setPage((currentPage) =>
-            Math.min(notificationsQuery.data?.totalPages ?? currentPage, currentPage + 1)
-          )
-        }
+        page={pageIndex + 1}
+        hasPrevious={pageIndex > 0}
+        hasNext={notificationsQuery.data?.page.hasMore ?? false}
+        onPreviousPage={() => setPageIndex((current) => Math.max(0, current - 1))}
+        onNextPage={() => {
+          const nextCursor = notificationsQuery.data?.page.nextCursor;
+          if (!nextCursor) return;
+          setCursorHistory((current) => {
+            const next = current.slice(0, pageIndex + 1);
+            next[pageIndex + 1] = nextCursor;
+            return next;
+          });
+          setPageIndex((current) => current + 1);
+        }}
         emptyState={
           <EmptyState
             icon={BellRing}

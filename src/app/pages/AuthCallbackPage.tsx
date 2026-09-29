@@ -1,11 +1,10 @@
 import { useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "../lib/auth";
 import { LoadingScreen } from "../components/LoadingScreen";
 
 export function AuthCallbackPage() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { refreshSession } = useAuth();
 
@@ -14,16 +13,15 @@ export function AuthCallbackPage() {
 
     async function run(): Promise<void> {
       try {
-        await refreshSession();
+        const authenticated = await refreshSession();
 
         if (!mounted) {
           return;
         }
 
-        if (searchParams.get("status") === "success") {
-          toast.success("Signed in successfully");
-        }
+        if (!authenticated) throw new Error("Session was not established");
 
+        toast.success("Signed in successfully");
         navigate("/dashboard/overview", { replace: true });
       } catch {
         if (!mounted) {
@@ -40,7 +38,7 @@ export function AuthCallbackPage() {
     return () => {
       mounted = false;
     };
-  }, [navigate, refreshSession, searchParams]);
+  }, [navigate, refreshSession]);
 
   return <LoadingScreen message="Finishing sign in..." />;
 }
