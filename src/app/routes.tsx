@@ -22,6 +22,7 @@ const GuildStreamersPage = lazy(async () => ({
 const GuildNotificationsPage = lazy(async () => ({
   default: (await import("./pages/GuildNotificationsPage")).GuildNotificationsPage
 }));
+const GuildInstantsPage = lazy(async () => ({ default: (await import("./pages/GuildInstantsPage")).GuildInstantsPage }));
 const SetupPage = lazy(async () => ({
   default: (await import("./pages/SetupPage")).SetupPage
 }));
@@ -43,6 +44,7 @@ const AdminPresencePage = lazy(async () => ({
 const AdminAccessPage = lazy(async () => ({
   default: (await import("./pages/AdminAccessPage")).AdminAccessPage
 }));
+const AdminInstantsPage = lazy(async () => ({ default: (await import("./pages/AdminInstantsPage")).AdminInstantsPage }));
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
   const { isLoading, isAuthenticated } = useAuth();
@@ -98,6 +100,7 @@ export function AppRoutes() {
           <Route path="guilds/:guildId" element={<GuildDetailPage />} />
           <Route path="guilds/:guildId/streamers" element={<GuildStreamersPage />} />
           <Route path="guilds/:guildId/notifications" element={<GuildNotificationsPage />} />
+          <Route path="guilds/:guildId/instants" element={<GuildInstantsPage />} />
           <Route path="setup" element={<SetupPage />} />
           <Route path="account" element={<AccountPage />} />
           <Route
@@ -140,6 +143,7 @@ export function AppRoutes() {
               </GlobalAdminRoute>
             }
           />
+          <Route path="admin/instants" element={<GlobalAdminRoute><AdminInstantsPage /></GlobalAdminRoute>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard/overview" replace />} />

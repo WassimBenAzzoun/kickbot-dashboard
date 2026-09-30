@@ -3,6 +3,7 @@ import {
   BellRing,
   LayoutDashboard,
   MoonStar,
+  Music2,
   ShieldCheck,
   Settings2,
   Sparkles,
@@ -216,6 +217,13 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
                 activeWhen={(pathname) => pathname.includes("/notifications")}
                 onNavigate={onNavigate}
               />
+              <SidebarLink
+                to={primaryGuild ? buildGuildRoute(primaryGuild.id, "instants") : "/dashboard/setup"}
+                label="Instants"
+                icon={Music2}
+                activeWhen={(pathname) => pathname.includes("/instants") && !pathname.includes("/admin/")}
+                onNavigate={onNavigate}
+              />
             </div>
           </div>
 
@@ -273,6 +281,13 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
                     label="Admin access"
                     icon={UserCircle2}
                     activeWhen={(pathname) => pathname.includes("/admin/access")}
+                    onNavigate={onNavigate}
+                  />
+                  <SidebarLink
+                    to="/dashboard/admin/instants"
+                    label="Instants"
+                    icon={Music2}
+                    activeWhen={(pathname) => pathname.includes("/admin/instants")}
                     onNavigate={onNavigate}
                   />
                 </>

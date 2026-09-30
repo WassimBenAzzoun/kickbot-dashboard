@@ -149,6 +149,9 @@ export function GlobalAdminPage() {
             <Button asChild variant="outline" className="justify-start">
               <Link to="/dashboard/admin/access">Open admin access</Link>
             </Button>
+            <Button asChild variant="outline" className="justify-start">
+              <Link to="/dashboard/admin/instants">Configure Instants</Link>
+            </Button>
           </CardContent>
         </Card>
 

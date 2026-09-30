@@ -1,5 +1,5 @@
 import { Link, NavLink } from "react-router-dom";
-import { Activity, ShieldCheck, ShieldEllipsis, UsersRound, Wrench } from "lucide-react";
+import { Activity, Music2, ShieldCheck, ShieldEllipsis, UsersRound, Wrench } from "lucide-react";
 import { cn } from "@/app/lib/utils";
 import { Button } from "@/app/components/ui/button";
 
@@ -10,6 +10,12 @@ const adminLinks: Array<{
   icon: typeof Wrench;
   exact?: boolean;
 }> = [
+  {
+    to: "/dashboard/admin/instants",
+    label: "Instants",
+    description: "Control voice playback and its global user allowlist.",
+    icon: Music2
+  },
   {
     to: "/dashboard/admin",
     label: "Overview",
@@ -68,7 +74,7 @@ export function AdminSectionNav({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
       {adminLinks.map((item) => {
         const Icon = item.icon;
 

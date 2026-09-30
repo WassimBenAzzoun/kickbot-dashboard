@@ -92,8 +92,31 @@ export interface BotSettings {
   defaultStatusEnabled: boolean;
   defaultStatusText: string | null;
   defaultActivityType: BotActivityType | null;
+  instantsEnabled: boolean;
+  instantAccessMode: InstantAccessMode;
   createdAt: string;
   updatedAt: string;
+}
+
+export type InstantAccessMode = "EVERYONE" | "ALLOWLIST_ONLY";
+export interface InstantLimits { maxAudioBytes: number; maxDurationSeconds: number; maxQueueLength: number; userCooldownSeconds: number; maxActiveGuilds: number; idleDisconnectSeconds: number; }
+export interface InstantSettings { enabled: boolean; accessMode: InstantAccessMode; limits: InstantLimits; }
+export interface InstantCapabilities extends InstantSettings { canPlay: boolean; voiceRuntimeAvailable: boolean; }
+export interface InstantSearchResult { id: string; title: string; pageUrl: string; }
+export interface InstantVoiceChannel { id: string; name: string; type: number; memberCount: number; }
+export interface InstantQueueItem {
+  id: string; title: string; pageUrl: string; requestedByDiscordUserId: string;
+  requestedVia: "DASHBOARD" | "DISCORD"; voiceChannelId: string; state: "QUEUED" | "PLAYING";
+  position: number; enqueuedAt: string;
+}
+export interface InstantQueueStatus {
+  connectionState: "IDLE" | "CONNECTING" | "READY" | "PLAYING";
+  voiceChannelId: string | null; current: InstantQueueItem | null; items: InstantQueueItem[];
+  idleDisconnectAt: string | null; lastError: { code: string; message: string; occurredAt: string } | null;
+}
+export interface InstantAllowedUser {
+  discordId: string; username: string | null; globalName: string | null; avatarHash: string | null;
+  avatarUrl: string | null; addedByDiscordUserId: string; createdAt: string; updatedAt: string;
 }
 
 export type GlobalBotConfig = BotSettings;
@@ -187,6 +210,17 @@ export function getGuildNotifications(guildId: string, cursor?: string, limit = 
   if (cursor) query.set("cursor", cursor);
   return apiFetch(`/guilds/${guildId}/notifications?${query.toString()}`);
 }
+export function getInstantCapabilities(guildId: string): Promise<InstantCapabilities> { return apiFetch(`/guilds/${guildId}/instants/capabilities`); }
+export async function getInstantVoiceChannels(guildId: string): Promise<InstantVoiceChannel[]> { return (await apiFetch<Collection<InstantVoiceChannel>>(`/guilds/${guildId}/instants/voice-channels`)).items; }
+export async function searchInstants(guildId: string, query: string, limit = 20): Promise<InstantSearchResult[]> {
+  const params = new URLSearchParams({ query, limit: String(limit) });
+  return (await apiFetch<Collection<InstantSearchResult>>(`/guilds/${guildId}/instants/search?${params}`)).items;
+}
+export function enqueueInstant(guildId: string, voiceChannelId: string, instantUrl: string): Promise<{ item: InstantQueueItem; position: number; startsImmediately: boolean }> {
+  return apiFetch(`/guilds/${guildId}/instants/queue`, { method: "POST", body: JSON.stringify({ voiceChannelId, instantUrl }) });
+}
+export function getInstantQueue(guildId: string): Promise<InstantQueueStatus> { return apiFetch(`/guilds/${guildId}/instants/queue`); }
+export async function stopInstantQueue(guildId: string): Promise<void> { await apiFetch(`/guilds/${guildId}/instants/queue`, { method: "DELETE" }); }
 
 export function getAdminSettings(): Promise<BotSettings> { return apiFetch("/admin/settings"); }
 export function updateAdminSettings(input: Partial<Omit<BotSettings, "id" | "createdAt" | "updatedAt">>): Promise<BotSettings> {
@@ -210,6 +244,11 @@ export async function leaveAdminBotGuild(guildId: string): Promise<void> { await
 export function updateAdminGuildAccess(guildId: string, isAllowed: boolean, notes?: string | null): Promise<DiscordGuild> {
   return apiFetch(`/admin/guilds/${guildId}/access`, { method: "PATCH", body: JSON.stringify({ isAllowed, notes }) });
 }
+export function getAdminInstantSettings(): Promise<InstantSettings> { return apiFetch("/admin/instants/settings"); }
+export function updateAdminInstantSettings(input: Partial<Pick<InstantSettings, "enabled" | "accessMode">>): Promise<InstantSettings> { return apiFetch("/admin/instants/settings", { method: "PATCH", body: JSON.stringify(input) }); }
+export async function getAdminInstantAllowedUsers(): Promise<InstantAllowedUser[]> { return (await apiFetch<Collection<InstantAllowedUser>>("/admin/instants/allowed-users")).items; }
+export function addAdminInstantAllowedUser(discordId: string): Promise<InstantAllowedUser> { return apiFetch("/admin/instants/allowed-users", { method: "POST", body: JSON.stringify({ discordId }) }); }
+export async function removeAdminInstantAllowedUser(discordId: string): Promise<void> { await apiFetch(`/admin/instants/allowed-users/${discordId}`, { method: "DELETE" }); }
 
 export const ACTIVITY_TYPES: BotActivityType[] = ["PLAYING", "WATCHING", "LISTENING", "COMPETING", "CUSTOM"];
 export const PRESENCE_PLACEHOLDERS = ["{guilds}", "{streamers}"] as const;

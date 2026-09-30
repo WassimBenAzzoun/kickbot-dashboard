@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiHttpError,
+  addAdminInstantAllowedUser,
   addStreamer,
+  enqueueInstant,
   getGuildNotifications,
   leaveAdminBotGuild,
-  updateAdminGuildAccess
+  updateAdminGuildAccess,
+  updateAdminInstantSettings
 } from "./api";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -75,5 +78,17 @@ describe("API client", () => {
       details: { guildId: "123" },
       requestId: "request-1"
     });
+  });
+
+  it("maps instant playback and admin access operations", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => jsonResponse({}));
+    vi.stubGlobal("fetch", fetchMock);
+    await enqueueInstant("123", "456", "https://www.myinstants.com/en/instant/airhorn/");
+    await updateAdminInstantSettings({ enabled: true, accessMode: "ALLOWLIST_ONLY" });
+    await addAdminInstantAllowedUser("123456789012345678");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/v1/guilds/123/instants/queue");
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ method: "POST", body: JSON.stringify({ voiceChannelId: "456", instantUrl: "https://www.myinstants.com/en/instant/airhorn/" }) }));
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/v1/admin/instants/settings");
+    expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/v1/admin/instants/allowed-users");
   });
 });

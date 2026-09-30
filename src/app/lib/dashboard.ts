@@ -10,6 +10,9 @@ export const dashboardKeys = {
   guildConfig: (guildId: string) => ["guild", guildId, "config"] as const,
   guildChannels: (guildId: string) => ["guild", guildId, "channels"] as const,
   guildStreamers: (guildId: string) => ["guild", guildId, "streamers"] as const,
+  instantCapabilities: (guildId: string) => ["guild", guildId, "instants", "capabilities"] as const,
+  instantVoiceChannels: (guildId: string) => ["guild", guildId, "instants", "voice-channels"] as const,
+  instantQueue: (guildId: string) => ["guild", guildId, "instants", "queue"] as const,
   guildNotifications: (guildId: string, cursor: string | undefined, limit: number) =>
     ["guild", guildId, "notifications", cursor ?? "first", limit] as const
 };
@@ -63,7 +66,7 @@ export function extractGuildIdFromPath(pathname: string): string | null {
 
 export function buildGuildRoute(
   guildId: string,
-  section: "settings" | "streamers" | "notifications" = "settings"
+  section: "settings" | "streamers" | "notifications" | "instants" = "settings"
 ): string {
   if (section === "streamers") {
     return `/dashboard/guilds/${guildId}/streamers`;
@@ -72,6 +75,7 @@ export function buildGuildRoute(
   if (section === "notifications") {
     return `/dashboard/guilds/${guildId}/notifications`;
   }
+  if (section === "instants") return `/dashboard/guilds/${guildId}/instants`;
 
   return `/dashboard/guilds/${guildId}`;
 }

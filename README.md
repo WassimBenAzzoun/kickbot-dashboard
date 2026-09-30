@@ -51,6 +51,10 @@ https://<VERCEL_PROJECT>.vercel.app/api/v1/auth/discord/callback
 
 The backend remains authoritative for authentication, guild permissions, and global-admin access. Hiding admin routes in this SPA is only a user-interface convenience.
 
+## Discord Instants
+
+The guild workspace includes an Instants page for voice-channel selection, Myinstants search, pasted page links, and live queue control. Global admins configure the disabled-by-default kill switch, `EVERYONE`/`ALLOWLIST_ONLY` mode, and Discord-user allowlist under **Admin → Instants**. Queue polling uses the existing same-origin `/api/v1` proxy and adds no Vercel compute.
+
 ## API contract
 
 The canonical prefix is `/api/v1`. The client consumes direct entity responses, `{ items, page: { nextCursor, hasMore } }` collections, normalized error objects, and cursor-based notification history. The live backend OpenAPI contract is available at `/api/docs-json` through the same proxy.

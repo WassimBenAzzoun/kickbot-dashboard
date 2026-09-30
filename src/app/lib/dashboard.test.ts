@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDashboardMetrics, normalizeGuild } from "./dashboard";
+import { buildGuildRoute, getDashboardMetrics, normalizeGuild } from "./dashboard";
 
 describe("guild normalization", () => {
   it("derives bot connectivity from membership state", () => {
@@ -22,5 +22,8 @@ describe("guild normalization", () => {
       trackedStreamerCount: 3
     });
     expect(getDashboardMetrics([guild]).connectedGuilds).toBe(1);
+  });
+  it("builds the guild Instants workspace route", () => {
+    expect(buildGuildRoute("123", "instants")).toBe("/dashboard/guilds/123/instants");
   });
 });
