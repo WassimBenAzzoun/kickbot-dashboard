@@ -258,14 +258,14 @@ export function OverviewPage() {
               {filteredGuilds.map((guild) => (
                 <Card className="border border-border/70 bg-background/70 shadow-none" key={guild.id}>
                   <CardHeader className="gap-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
                         <GuildAvatar
                           name={guild.name}
                           iconUrl={guild.iconUrl}
                           initials={guild.initials}
                         />
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <CardTitle className="truncate text-base">{guild.name}</CardTitle>
                           <CardDescription>{guild.trackedStreamerCount} tracked streamers</CardDescription>
                         </div>
