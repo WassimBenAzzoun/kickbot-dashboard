@@ -38,7 +38,7 @@ function navItemClass(isActive: boolean) {
   return cn(
     "flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-sm font-medium transition-colors",
     isActive
-      ? "border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+      ? "border-primary/25 bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
       : "border-transparent text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
   );
 }
@@ -91,7 +91,7 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
       <div className="flex w-20 flex-col items-center gap-5 border-r border-sidebar-border px-3 py-4">
         <Link
           to="/dashboard/overview"
-          className="flex size-12 items-center justify-center rounded-[20px] bg-primary text-lg font-bold text-primary-foreground shadow-sm"
+          className="flex size-12 items-center justify-center rounded-[20px] bg-primary text-lg font-bold text-primary-foreground shadow-sm ring-1 ring-brand-discord/25"
           onClick={onNavigate}
         >
           KB

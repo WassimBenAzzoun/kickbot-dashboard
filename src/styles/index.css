@@ -26,6 +26,15 @@
   --color-input: hsl(var(--input));
   --color-input-background: hsl(var(--input-background));
   --color-ring: hsl(var(--ring));
+  --color-brand-discord: hsl(var(--brand-discord));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-success-muted: hsl(var(--success-muted));
+  --color-success-muted-foreground: hsl(var(--success-muted-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-warning-muted: hsl(var(--warning-muted));
+  --color-warning-muted-foreground: hsl(var(--warning-muted-foreground));
 
   --color-sidebar: hsl(var(--sidebar-background));
   --color-sidebar-foreground: hsl(var(--sidebar-foreground));
@@ -47,28 +56,37 @@
   --card-foreground: 222 25% 16%;
   --popover: 0 0% 100%;
   --popover-foreground: 222 25% 16%;
-  --primary: 222 47% 16%;
-  --primary-foreground: 210 40% 98%;
+  --primary: 235 51.4% 52.4%;
+  --primary-foreground: 0 0% 100%;
   --secondary: 216 32% 94%;
   --secondary-foreground: 222 22% 24%;
   --muted: 214 24% 93%;
   --muted-foreground: 218 14% 42%;
-  --accent: 215 38% 92%;
-  --accent-foreground: 222 25% 16%;
-  --destructive: 0 70% 52%;
-  --destructive-foreground: 210 40% 98%;
+  --accent: 233 100% 96.7%;
+  --accent-foreground: 235 51.4% 40%;
+  --destructive: 4 76.5% 40%;
+  --destructive-foreground: 0 0% 100%;
   --border: 214 24% 87%;
-  --input: 214 24% 87%;
+  --input: 219 13.6% 59.6%;
   --input-background: 0 0% 100%;
-  --ring: 222 47% 32%;
+  --ring: 235 85.6% 64.7%;
+  --brand-discord: 235 85.6% 64.7%;
+  --success: 138 70.7% 22.7%;
+  --success-foreground: 0 0% 100%;
+  --success-muted: 113 56.2% 93.7%;
+  --success-muted-foreground: 138 70.7% 22.7%;
+  --warning: 32 81% 28.8%;
+  --warning-foreground: 0 0% 100%;
+  --warning-muted: 47 100% 90%;
+  --warning-muted-foreground: 32 81% 28.8%;
   --radius: 1rem;
 
   --sidebar-background: 220 32% 97%;
   --sidebar-foreground: 222 24% 20%;
   --sidebar-border: 214 24% 88%;
-  --sidebar-accent: 214 26% 91%;
-  --sidebar-accent-foreground: 222 25% 16%;
-  --sidebar-ring: 222 47% 32%;
+  --sidebar-accent: 233 68% 95.1%;
+  --sidebar-accent-foreground: 235 51.4% 40%;
+  --sidebar-ring: 235 85.6% 64.7%;
 }
 
 .dark,
@@ -79,27 +97,36 @@
   --card-foreground: 210 40% 96%;
   --popover: 224 24% 14%;
   --popover-foreground: 210 40% 96%;
-  --primary: 210 40% 96%;
-  --primary-foreground: 222 47% 11%;
+  --primary: 236 88.5% 72.7%;
+  --primary-foreground: 231 27.7% 9.2%;
   --secondary: 222 19% 20%;
   --secondary-foreground: 210 40% 96%;
   --muted: 223 18% 19%;
   --muted-foreground: 217 14% 72%;
-  --accent: 223 18% 22%;
-  --accent-foreground: 210 40% 96%;
-  --destructive: 0 70% 56%;
-  --destructive-foreground: 210 40% 98%;
+  --accent: 234 30.1% 20.2%;
+  --accent-foreground: 233 100% 93.9%;
+  --destructive: 0 73.7% 41.8%;
+  --destructive-foreground: 0 0% 100%;
   --border: 223 15% 24%;
-  --input: 223 15% 24%;
-  --input-background: 223 20% 16%;
-  --ring: 214 78% 78%;
+  --input: 219 10.8% 47.1%;
+  --input-background: 221 24.7% 15.1%;
+  --ring: 235 85.6% 64.7%;
+  --brand-discord: 235 85.6% 64.7%;
+  --success: 107 80.8% 67.3%;
+  --success-foreground: 231 27.7% 9.2%;
+  --success-muted: 129 35.1% 14.5%;
+  --success-muted-foreground: 107 80.8% 67.3%;
+  --warning: 46 96.7% 64.5%;
+  --warning-foreground: 231 27.7% 9.2%;
+  --warning-muted: 38 52.6% 14.9%;
+  --warning-muted-foreground: 46 96.7% 64.5%;
 
   --sidebar-background: 224 30% 12%;
   --sidebar-foreground: 210 40% 95%;
   --sidebar-border: 223 18% 21%;
-  --sidebar-accent: 223 18% 18%;
-  --sidebar-accent-foreground: 210 40% 96%;
-  --sidebar-ring: 214 78% 78%;
+  --sidebar-accent: 234 30.1% 20.2%;
+  --sidebar-accent-foreground: 233 100% 93.9%;
+  --sidebar-ring: 235 85.6% 64.7%;
 }
 
 * {
@@ -154,8 +181,12 @@ body::before {
   isolation: isolate;
 }
 
-a {
+a:not([class]) {
   color: inherit;
+  text-decoration: none;
+}
+
+a[class] {
   text-decoration: none;
 }
 
@@ -268,8 +299,8 @@ select {
 }
 
 .badge-success {
-  background: rgb(34 197 94 / 0.12);
-  color: rgb(21 128 61);
+  background: hsl(var(--success-muted));
+  color: hsl(var(--success-muted-foreground));
 }
 
 .badge-muted {
@@ -278,8 +309,8 @@ select {
 }
 
 .badge-warn {
-  background: rgb(245 158 11 / 0.14);
-  color: rgb(180 83 9);
+  background: hsl(var(--warning-muted));
+  color: hsl(var(--warning-muted-foreground));
 }
 
 .table {

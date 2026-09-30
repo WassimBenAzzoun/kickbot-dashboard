@@ -1,13 +1,15 @@
 import { Navigate } from "react-router-dom";
-import { ArrowRight, BellRing, Server, Sparkles, Tv2 } from "lucide-react";
+import { ArrowRight, BellRing, MoonStar, Server, Sparkles, SunMedium, Tv2 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";
 import { Card, CardContent } from "@/app/components/ui/card";
 import { useAuth } from "@/app/lib/auth";
 import { LoadingScreen } from "@/app/components/LoadingScreen";
+import { useTheme } from "@/app/lib/theme";
 
 export function LoginPage() {
   const { isLoading, isAuthenticated, startDiscordLogin } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   if (isLoading) {
     return <LoadingScreen message="Checking session..." />;
@@ -20,6 +22,18 @@ export function LoginPage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-background">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.08),transparent_32%),radial-gradient(circle_at_bottom_right,hsl(var(--primary)/0.08),transparent_28%)]" />
+      <div className="absolute right-5 top-5 z-10 sm:right-8 sm:top-8">
+        <Button
+          variant="outline"
+          size="icon"
+          className="rounded-2xl bg-background/80 backdrop-blur-sm"
+          onClick={toggleTheme}
+          aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+          title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+        >
+          {theme === "light" ? <MoonStar /> : <SunMedium />}
+        </Button>
+      </div>
       <div className="relative mx-auto flex min-h-screen w-full max-w-7xl items-center px-6 py-16">
         <div className="grid w-full gap-8 lg:grid-cols-[0.95fr_1.05fr]">
           <div className="flex flex-col justify-between gap-8">
