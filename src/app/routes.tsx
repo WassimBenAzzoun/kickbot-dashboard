@@ -23,6 +23,7 @@ const GuildNotificationsPage = lazy(async () => ({
   default: (await import("./pages/GuildNotificationsPage")).GuildNotificationsPage
 }));
 const GuildInstantsPage = lazy(async () => ({ default: (await import("./pages/GuildInstantsPage")).GuildInstantsPage }));
+const GuildMusicPage = lazy(async () => ({ default: (await import("./pages/GuildMusicPage")).GuildMusicPage }));
 const SetupPage = lazy(async () => ({
   default: (await import("./pages/SetupPage")).SetupPage
 }));
@@ -101,6 +102,7 @@ export function AppRoutes() {
           <Route path="guilds/:guildId/streamers" element={<GuildStreamersPage />} />
           <Route path="guilds/:guildId/notifications" element={<GuildNotificationsPage />} />
           <Route path="guilds/:guildId/instants" element={<GuildInstantsPage />} />
+          <Route path="guilds/:guildId/music" element={<GuildMusicPage />} />
           <Route path="setup" element={<SetupPage />} />
           <Route path="account" element={<AccountPage />} />
           <Route

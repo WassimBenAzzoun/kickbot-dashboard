@@ -55,6 +55,10 @@ The backend remains authoritative for authentication, guild permissions, and glo
 
 The guild workspace includes an Instants page for voice-channel selection, Myinstants search, pasted page links, and live queue control. Global admins configure the disabled-by-default kill switch, `EVERYONE`/`ALLOWLIST_ONLY` mode, and Discord-user allowlist under **Admin → Instants**. Queue polling uses the existing same-origin `/api/v1` proxy and adds no Vercel compute.
 
+## Discord Music
+
+The Music workspace accepts YouTube video/playlist and Spotify track/playlist URLs, shows resolution failures per playlist item, and exposes now-playing progress plus pause, resume, skip, and stop controls. Spotify is metadata and attribution only; the backend matches each track to YouTube audio. Music shares the Instants global switch and allowlist, and all playback state stays on the single Heroku process.
+
 ## API contract
 
 The canonical prefix is `/api/v1`. The client consumes direct entity responses, `{ items, page: { nextCursor, hasMore } }` collections, normalized error objects, and cursor-based notification history. The live backend OpenAPI contract is available at `/api/docs-json` through the same proxy.

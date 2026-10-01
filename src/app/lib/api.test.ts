@@ -4,6 +4,7 @@ import {
   addAdminInstantAllowedUser,
   addStreamer,
   enqueueInstant,
+  enqueueMusic,
   getGuildNotifications,
   leaveAdminBotGuild,
   updateAdminGuildAccess,
@@ -90,5 +91,22 @@ describe("API client", () => {
     expect(fetchMock.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ method: "POST", body: JSON.stringify({ voiceChannelId: "456", instantUrl: "https://www.myinstants.com/en/instant/airhorn/" }) }));
     expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/v1/admin/instants/settings");
     expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/v1/admin/instants/allowed-users");
+  });
+
+  it("maps music queue and control operations", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ accepted: [], rejected: [], truncated: false }));
+    vi.stubGlobal("fetch", fetchMock);
+    await enqueueMusic("123", "456", "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/guilds/123/music/queue",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          voiceChannelId: "456",
+          sourceUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        }),
+        credentials: "include"
+      })
+    );
   });
 });

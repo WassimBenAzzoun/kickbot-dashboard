@@ -119,6 +119,60 @@ export interface InstantAllowedUser {
   avatarUrl: string | null; addedByDiscordUserId: string; createdAt: string; updatedAt: string;
 }
 
+export interface MusicLimits {
+  maxDurationSeconds: number;
+  maxPlaylistItems: number;
+  maxQueueLength: number;
+  maxActiveGuilds: number;
+}
+export interface MusicCapabilities {
+  enabled: boolean;
+  accessMode: InstantAccessMode;
+  canPlay: boolean;
+  voiceRuntimeAvailable: boolean;
+  spotifyAvailable: boolean;
+  limits: MusicLimits;
+}
+export interface MusicQueueItem {
+  id: string;
+  sourceId: string;
+  title: string;
+  artist: string | null;
+  provider: "YOUTUBE" | "SPOTIFY";
+  originalUrl: string;
+  resolvedYouTubeUrl: string;
+  thumbnailUrl: string | null;
+  durationSeconds: number;
+  requestedByDiscordUserId: string;
+  requestedVia: "DASHBOARD" | "DISCORD";
+  voiceChannelId: string;
+  state: "QUEUED" | "PLAYING" | "PAUSED";
+  position: number;
+  enqueuedAt: string;
+}
+export interface RejectedMusicTrack {
+  sourceUrl: string;
+  title?: string;
+  code: string;
+  message: string;
+}
+export interface MusicEnqueueResult {
+  accepted: MusicQueueItem[];
+  rejected: RejectedMusicTrack[];
+  truncated: boolean;
+}
+export interface MusicQueueStatus {
+  connectionState: "IDLE" | "CONNECTING" | "READY" | "PLAYING";
+  voiceChannelId: string | null;
+  current: MusicQueueItem | null;
+  items: MusicQueueItem[];
+  paused: boolean;
+  interruptedByInstant: boolean;
+  progressMs: number;
+  idleDisconnectAt: string | null;
+  lastError: { code: string; message: string; occurredAt: string } | null;
+}
+
 export type GlobalBotConfig = BotSettings;
 
 export interface BotStatusMessage {
@@ -221,6 +275,15 @@ export function enqueueInstant(guildId: string, voiceChannelId: string, instantU
 }
 export function getInstantQueue(guildId: string): Promise<InstantQueueStatus> { return apiFetch(`/guilds/${guildId}/instants/queue`); }
 export async function stopInstantQueue(guildId: string): Promise<void> { await apiFetch(`/guilds/${guildId}/instants/queue`, { method: "DELETE" }); }
+export function getMusicCapabilities(guildId: string): Promise<MusicCapabilities> { return apiFetch(`/guilds/${guildId}/music/capabilities`); }
+export function enqueueMusic(guildId: string, voiceChannelId: string, sourceUrl: string): Promise<MusicEnqueueResult> {
+  return apiFetch(`/guilds/${guildId}/music/queue`, { method: "POST", body: JSON.stringify({ voiceChannelId, sourceUrl }) });
+}
+export function getMusicQueue(guildId: string): Promise<MusicQueueStatus> { return apiFetch(`/guilds/${guildId}/music/queue`); }
+export async function pauseMusic(guildId: string): Promise<void> { await apiFetch(`/guilds/${guildId}/music/pause`, { method: "POST" }); }
+export async function resumeMusic(guildId: string): Promise<void> { await apiFetch(`/guilds/${guildId}/music/resume`, { method: "POST" }); }
+export async function skipMusic(guildId: string): Promise<void> { await apiFetch(`/guilds/${guildId}/music/skip`, { method: "POST" }); }
+export async function stopMusic(guildId: string): Promise<void> { await apiFetch(`/guilds/${guildId}/music/queue`, { method: "DELETE" }); }
 
 export function getAdminSettings(): Promise<BotSettings> { return apiFetch("/admin/settings"); }
 export function updateAdminSettings(input: Partial<Omit<BotSettings, "id" | "createdAt" | "updatedAt">>): Promise<BotSettings> {

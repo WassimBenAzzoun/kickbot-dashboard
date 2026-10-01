@@ -2,6 +2,7 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import {
   BellRing,
   LayoutDashboard,
+  Headphones,
   MoonStar,
   Music2,
   ShieldCheck,
@@ -222,6 +223,13 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
                 label="Instants"
                 icon={Music2}
                 activeWhen={(pathname) => pathname.includes("/instants") && !pathname.includes("/admin/")}
+                onNavigate={onNavigate}
+              />
+              <SidebarLink
+                to={primaryGuild ? buildGuildRoute(primaryGuild.id, "music") : "/dashboard/setup"}
+                label="Music"
+                icon={Headphones}
+                activeWhen={(pathname) => pathname.includes("/music")}
                 onNavigate={onNavigate}
               />
             </div>
